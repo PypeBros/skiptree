@@ -5,8 +5,10 @@ import time
 import threading
 
 # ResumeNet imports
-from messages import RouteDirect, SNJoinRequest, SNLeaveRequest, NeighbourhoodNet
-from nodeid import NumericID
+from equation import CPE
+from equation import DataStore
+from messages import RouteDirect, SNJoinRequest, SNLeaveRequest, NeighbourhoodNet, STJoinRequest
+from nodeid import NumericID, PartitionID
 from network import OutRequestManager
 from neighbourhood import Neighbourhood
 
@@ -87,18 +89,19 @@ class Node(object):
         self.__numeric_id = numeric_id              #SkipNet "Numeric identifier"
         self.__net_info = net_info                  #Interface to network layer                
 
-        #TODO: Hack for the moment PartitionID = NameID
-        self.__partition_id = self.__name_id        #SkipTree "Partition identifier" (this Node among the Partition Tree)
-        self.__cpe = None                           #Space managed by this Node
+        partition_id = PartitionID.gen()
+        self.__partition_id = partition_id          #SkipTree "Partition identifier" (this Node among the Partition Tree)
+        self.__cpe = CPE()                          #Space managed by this Node
+        self.__data_store = DataStore()             #Object where the data are stored
 
         self.__dispatcher = None                    #Message dispatcher
         self.__send = OutRequestManager(self)       #Interface to send Message
         self.__neighbourhood = Neighbourhood(self)  #Neighbours
 
-        # Launch the heart beat. 
+        # Launch the heart beats. 
         th = NodeHeartBeat(self)
         th.daemon = True
-        th.start()
+        #th.start()
 
     #
     # Properties
@@ -113,18 +116,38 @@ class Node(object):
 
     @property
     def name_id(self):
-        """Return the name identifier of the Node."""
+        """Return the "Name identifier" of the Node."""
         return self.__name_id
 
     @property
     def numeric_id(self):
-        """Return the numeric identifier of the Node."""
+        """Return the "Numeric identifier" of the Node."""
         return self.__numeric_id
 
     @property
     def partition_id(self):
-        """Return the partition id of the Node."""
+        """Return the "Partition identifier" of the Node."""
         return self.__partition_id
+
+    @partition_id.setter
+    def partition_id(self, value):
+        """Set the "Partition identifier" of the Node."""
+        self.__partition_id = value
+
+    @property
+    def cpe(self):
+        """Return the CPE of the Node."""
+        return self.__cpe
+
+    @cpe.setter
+    def cpe(self, value):
+        """Set the CPE of the Node."""
+        self.__cpe = value
+
+    @property
+    def data_store(self):
+        """Return the DataStore of the Node."""
+        return self.__data_store
 
     @property
     def net_info(self):
@@ -152,6 +175,17 @@ class Node(object):
 
         # Join SkipNet
         payload_msg = SNJoinRequest(self)
+        route_msg = RouteDirect(payload_msg, contact_node)
+        self.route_internal(route_msg)
+
+    def join2(self, boot_net_info):
+        """Join the overlay."""
+        #TODO: Improve the node creation
+        fake_numeric_id = NumericID()
+        contact_node = Node(None, fake_numeric_id, boot_net_info)
+
+        ## Join the SkipTree
+        payload_msg = STJoinRequest(self)
         route_msg = RouteDirect(payload_msg, contact_node)
         self.route_internal(route_msg)
 

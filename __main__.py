@@ -70,7 +70,7 @@ class ThreadTalker(threading.Thread):
         self.__local_node = local_node
 
         self.__menu = list()
-        self.__menu.append(("Display the local node.", self.__display_node))
+        self.__menu.append(("Display local node information.", self.__display))
         self.__menu.append(("Send a join message.", self.__send_join))
         self.__menu.append(("Send a leave message.", self.__send_leave))
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
@@ -78,30 +78,39 @@ class ThreadTalker(threading.Thread):
     def run(self):
         time.sleep(0.5)
         while True:
-            self.__get_action()
+            self.__get_action(self.__menu)
 
-    def __get_action(self):
+    def __get_action(self, actions):
         index_action = 0
         while True:
             try:
                 choice = -1
                 print("\r\nWitch action do you want to do ?")
-                for i in range(len(self.__menu)):
-                    print("  ", i, ". ", self.__menu[i][0], sep="")
+                for i in range(len(actions)):
+                    print("  ", i, ". ", actions[i][0], sep="")
                 choice = int(input())
-                if(0 <= choice and choice < len(self.__menu)):
+                if(0 <= choice and choice < len(actions)):
                     index_action = choice
                     break
             except ValueError:
                 print("\r\n")
 
-        self.__menu[index_action][1]()
+        actions[index_action][1]()
+
+    def __display(self):
+        display_actions = list()
+        display_actions.append(("Display the local node.", self.__display_node))
+        display_actions.append(("Display the local node CPE.", self.__display_node_cpe))
+
+        self.__get_action(display_actions)
 
     def __display_node(self):
         print("Action - Display the local node")
-
         print(self.__local_node.__repr__())
 
+    def __display_node_cpe(self):
+        print("Action - Display the local node CPE")
+        print(self.__local_node.cpe.__repr__())
 
     def __send_join(self):
         print("Action - Send a join message")
@@ -191,12 +200,58 @@ def main():
         LOGGER.log(logging.WARNING, "There is an error in the main thread: " + str(sys.exc_info()[0]))
 
 
+class Contain(object):
+
+    def __init__(self):
+        self.__list = list()
+
+    def add(self, elem):
+        self.__list.append(elem)
+
+    @property
+    def values(self):
+        return self.__list
+
+class Val(object):
+
+    def __init__(self, val):
+        self.__val = val
+
+    @property
+    def val(self):
+        return self.__val
+
+import copy
+
 if __name__ == "__main__":
 
-    if (len(sys.argv) != 5):
-        print("-ERR : The number of argument isn't right.")
+    execute_main = False
 
+    if(execute_main):
+        if (len(sys.argv) != 5):
+            print("-ERR : The number of argument isn't right.")
+            print("*NFO : python3 __main__.py <IP_ADDRESS> <PORT_NUMBER> <NAME_ID> <NUMERIC_ID>")
+        else:
+            main()
     else:
-        main()
+        print("*NFO : Test the array appending and x.")
+
+        #TODO: append is not the good function.
+
+        datas = ['a', 'b', ['c']]
+        print(datas)
+        print(len(datas))
+
+        p_data = ['z']
+        print(p_data)
+
+        a, b, c = datas
+        c.extend(p_data)
+        datas = [a, b, c]
+        print(datas)
+
+        print("---- ---- ---- ---- ---- ---- ---- ----")
+
+
 
 

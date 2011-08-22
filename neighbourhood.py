@@ -25,8 +25,6 @@ LOGGER.addHandler(LOG_HANDLER)
 
 # ------------------------------------------------------------------------------------------------
 
-#TODO: Try to not be node dependant.
-
 class Neighbourhood(object):
     """Stores a set of pointers to neighbours nodes."""
 
@@ -74,13 +72,6 @@ class Neighbourhood(object):
         added = False
         if(0 <= level and level < len(self.__rings)):
             added = self.__rings[level].add_neighbour(new_neighbour)
-        return added
-
-    def add_neighbour_everywhere(self, level, new_neighbour):
-        added = False
-        xsup = 0
-        for index in (0, xsup + 1):
-            added |= self.__rings[index].add_neighbour(new_neighbour)
         return added
 
     def remove_neighbour(self, old_neighbour):
@@ -227,7 +218,7 @@ class HalfRingSet(object):
                 current = self.__neighbours[i]
 
                 if (current == node_to_add):
-                    # Always take the last version of node (CPE may change).
+                    # Always take the latest version of node (CPE may change).
                     self.__neighbours[i] = node_to_add
                     return False
                 else:

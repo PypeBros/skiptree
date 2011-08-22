@@ -101,6 +101,7 @@ class RequestReply(object):
         else:
             # This reply wasn't expected.
             # Maybe it arrives really too late.
+            pass
 
     def remove_entry(self, msg_id):
         """Remove an entry from the table."""

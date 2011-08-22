@@ -8,8 +8,11 @@ Messages are used to carry information. That information come
 import logging
 
 # ResumeNet imports
-from util import Direction
+from equation import Range
+from equation import SpacePart
+
 from nodeid import NodeID
+from util import Direction
 
 # ------------------------------------------------------------------------------------------------
 
@@ -80,6 +83,9 @@ class VisitorMessage(object):
 
     def visit_SNPingRequest(self, message):
         pass
+
+    def visit_STJoinRequest(self, message):
+        raise NotImplementedError()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -222,6 +228,35 @@ class RouteByPayload(RouteMessage):
 
     def accept(self, visitor):
         return visitor.visit_RouteByPayload(self)
+
+
+class RouteByCPE(RouteMessage):
+
+    #TODO: The RouteByCPE SpacePart should be a copy of the one from payload.
+
+    def __init__(self, payload):
+        RouteMessage.__init__(self, payload)
+
+        self.__space_part = SpacePart()
+        self.__limit = Range(None, None, False, False)
+
+    @property
+    def space_part(self):
+        """Return the SpacePart that characterizes the destination."""
+        return self.__space_part
+
+    @property
+    def limit(self):
+        """Return the limit (a Range object) in witch the message must remain."""
+        return self.__limit
+
+    @limit.setter
+    def limit(self, new_limit):
+        """Set the limit (a Range object) in witch the message must remain."""
+        self.__limit = new_limit
+
+    def accept(self, visitor):
+        return visitor.visit_RouteByCPE(self)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -380,8 +415,10 @@ class SNFixupHigher(RouteByPayload, CtrlMessage):
 
         self.__nb_hops = 0
 
-
     def route(self, local_node):
+        return [(self.__towards_highest_ring_next_hop(local_node), self)]
+
+    def __towards_highest_ring_next_hop(self, local_node):
         if (self.__first_hop):
             self.__first_hop = False
 
@@ -438,6 +475,108 @@ class SNFixupHigher(RouteByPayload, CtrlMessage):
     def _info(self):
         return "SNFixupHigher (" + str(self.__ring_level) + ", " + Direction.get_name(self.__direction) + ") - (" + str(self.__nb_hops) + ") - "
 
+# ------------------------------------------------------------------------------------------------
+
+class STJoinRequest(CtrlMessage):
+
+    STATE_ASK, STATE_ACCEPT, STATE_ERROR = range(3)
+
+    def __init__(self, joining_node, state=STATE_ASK):
+        CtrlMessage.__init__(self)
+
+        self.__phase = state
+        self.__joining_node = joining_node
+
+    #
+    # Properties
+
+    @property
+    def joining_node(self):
+        return self.__joining_node
+
+    @property
+    def phase(self):
+        """Return the phase in witch the message is involved."""
+        return self.__phase
+
+    @phase.setter
+    def phase(self, value):
+        """Set the phase in with the message is involved."""
+        self.__phase = value
+
+    #
+    #
+
+    def accept(self, visitor):
+        visitor.visit_STJoinRequest(self)
+
+
+class STJoinReply(CtrlMessage):
+
+    STATE_PROPOSE, STATE_CONFIRM, STATE_ERROR = range(3)
+
+    def __init__(self, contact_node, state=STATE_PROPOSE):
+        CtrlMessage.__init__(self)
+
+        self.__contact_node = contact_node
+
+        self.__cpe = None
+        self.__partition_id = None
+        self.__data = None
+
+    #
+    # Properties
+
+    @property
+    def contact_node(self):
+        """Return the node that have been contacted."""
+        return self.__contact_node
+
+    @property
+    def phase(self):
+        """Return the phase is witch the message is involved."""
+        return self.__phase
+
+    @phase.setter
+    def phase(self, value):
+        """Set the phase in with the message is involved."""
+        self.__phase = value
+
+    @property
+    def partition_id(self):
+        """Return the "Partition identifier"."""
+        return self.__partition_id
+
+    @partition_id.setter
+    def partition_id(self, value):
+        """Set the "Partition identifier"."""
+        self.__partition_id = value
+
+    @property
+    def cpe(self):
+        """Return the "Characteristic Path Equation"."""
+        return self.__cpe
+
+    @cpe.setter
+    def cpe(self, value):
+        """Set the "Characteristic Path Equation"."""
+        self.__cpe = value
+
+    @property
+    def data(self):
+        """Return the data."""
+        return self.__data
+
+    @data.setter
+    def data(self, value):
+        """Set the data."""
+        self.__data = value
+
+    #
+    #
+
+    def accept(self, visitor):
+        visitor.visit_STJoinRequest(self)
 
 # ------------------------------------------------------------------------------------------------
 

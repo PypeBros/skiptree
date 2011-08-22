@@ -1,11 +1,13 @@
 # System imports
 import hashlib
 import os
+import random
 
 # ResumeNet imports
 from util import Direction
 
 # ------------------------------------------------------------------------------------------------
+
 
 class NodeID(object):
 
@@ -246,3 +248,37 @@ class BitifiedByte(object):
             string = "0" + string
         return string
 
+
+import sys
+
+class PartitionID(NodeID):
+
+    LOW, UP = 0.0, 1.0
+
+    EPSILON = sys.float_info.epsilon
+
+    @staticmethod
+    def gen():
+        """Return a random "Partition ID"."""
+        return PartitionID.gen_btw(PartitionID.LOW, PartitionID.UP)
+
+    @staticmethod
+    def gen_bef(number):
+        """Return a "Partition ID" that stands before 'number'."""
+        return PartitionID.gen_btw(PartitionID.LOW, number)
+
+    @staticmethod
+    def gen_btw(lower, upper):
+        """Return a "Partition ID" that resides in closed range (Lower, Upper)."""
+        partition_id = lower
+        while(partition_id == lower or partition_id == upper):
+            new_pid = random.uniform(lower, upper)
+            if (abs(new_pid - partition_id) <= PartitionID.EPSILON):
+                raise ValueError
+            partition_id = new_pid
+        return partition_id
+
+    @staticmethod
+    def gen_aft(number):
+        """Return a "Partition ID" that stands after 'number'."""
+        return PartitionID.gen_btw(number, PartitionID.UP)

@@ -1,0 +1,12 @@
+
+invoke as 
+python3 __main__.py <IP ADDRESS> <PORTNO> <NAMERIC ID> <NUMERIC ID>
+
+where 
+	<IP ADRESS>:<PORTNO> identify process that is a "node" in the SkipTree
+	<NAMERIC ID> is any name = (char)?
+	<NUMERIC ID> is a hexadecimal number
+
+Nameric is any string                     \ used to identify the node.
+Numeric is a fixed-length bits sequence   /
+
