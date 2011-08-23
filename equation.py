@@ -174,6 +174,12 @@ class Dimension(object):
     def __hash__(self):
         return self.dimension.__hash__()
 
+    #
+    # Overwrite
+
+    def __repr__(self):
+        return str(self.__dimension)
+
 
 class Component(object):
 
@@ -227,6 +233,12 @@ class Component(object):
 
     def __hash__(self):
         return self.value.__hash__()
+
+    #
+    # Overwrite
+
+    def __repr__(self):
+        return str(self.__value) + " (" + str(self.__dimension) + ")"
 
 
 # ------------------------------------------------------------------------------------------------
@@ -299,7 +311,7 @@ class DataStore(object):
 
         # Add the data into the counters.
         for dim, valCounter in self.__data_by_dimension:
-            valCounter.add(data, space_part.get_component(dim))
+            valCounter.add(space_part.get_component(dim), data)
 
     def get_partition_value(self):
         """Return a pair (best dimension, best partition value)."""
@@ -328,15 +340,14 @@ class DataStore(object):
 
 class CompCounter(object):
 
-    #TODO: use a list for the free data, no more nb_virtual needed.
+    #TODO: Write description for the CompCounter.
 
     def __init__(self, dimension):
         self.__dimension = dimension
 
         self.__nb_value = 0
-        self.__nb_virtual = 0
         self.__virtual = list()
-        self.__constrained = list()    # List of pairs where a pair is defined as "(value, frequency of that value).
+        self.__constrained = list()    # List of sub-lists. Sub-list is as followed "[value, frequency of that value, data related].
 
         self.__changed = True
 
@@ -390,32 +401,45 @@ class CompCounter(object):
     #
     #
 
-    def add(self, p_data, p_comp):
+    def add(self, p_comp, p_data):
         """Add a component in this CompCounter."""
-        changed = True
+
+        #TODO: Change the signature.
+
+        self.__changed = True
         self.__nb_value += 1
         if(p_comp != None and not p_comp.virtual):
+            # The component is correctly defined: could be added.
             added = False
+            self.__constrained.sort(key=lambda m_list: m_list[0])   #Precondition
+
             for i in range(len(self.__constrained)):
                 comp, freq, datas = self.__constrained[i]
 
-                if (p_comp >= comp):
-                    datas = datas.extend(p_data)
-                    self.__constrained[i] = [comp, freq + 1, p_data]
-                    if (p_comp == comp):
-                        added = True
-                        break
-
-                elif(p_comp < comp):
+                if(p_comp < comp):
                     self.__constrained.insert(i, [p_comp, 1, [p_data]])
                     added = True
                     break
 
+                elif(p_comp == comp):
+                    datas.extend(p_data)
+                    self.__constrained[i] = [comp, freq + 1, datas]
+                    added = True
+                    break
+
             if(not added):
-                # When the p_comp is the highest ever seen.
+                # When the p_comp is the highest value ever seen.
                 self.__constrained.append([p_comp, 1, [p_data]])
+
         else:
+            # The component is virtual: should be process differently.
             self.__virtual.append(p_data)
+
+    def print_debug(self):
+        for i in range(len(self.__constrained)):
+            comp, freq, datas = self.__constrained[i]
+            print(i, ".", freq, "*", comp)
+            print(i, ".", "Data:", datas)
 
 
     def __compute_best_partition_values(self):

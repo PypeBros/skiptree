@@ -1,0 +1,192 @@
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Réflexions sur DISco</title>
+	<style type="text/css">
+		body {
+			text-align: justify;
+		}		
+
+		.not_verified {
+			color: grey;
+		}
+	</style>
+</head>
+<body>
+	<h1>Réflexions sur DISco</h1>
+
+	<h2>SkipTree</h2>
+	<p>Donner quelques explications sur SkipTree.</p>
+
+	<p>Les deux composantes principales s'articulent autour de la répartition des données et de l'échange des messages ...</p>
+
+	<h3>Partitionnement</h3>
+<p>Des noeuds SkipNet sont positionnés sur base de leur <em>identifiant dénominatif</em>.</p>
+
+<ul>
+	<li>Expliquer le postionnement des noeuds dans SkipNet.</li>
+</ul>
+
+<p class="not_verified">Est-il intéressant qu'un noeud communique à ses voisins la déconnexion d'un autre noeud ? Non. Seul le noeud se déconnectant prévient ses voisins avant sa déconnexion. Dans le cas d'un noeud planté, ses voisins détecteront sa déconnexion par l'abscence de Ping ou avec la rupture de connexion.</p>
+
+<ul>
+	<li>Un noeud gère une portion d'espace déterminée et <b>unique</b> dans l'espace de partitionnement.</li>
+	<li>Il n'existe <b>jamais</b> d'espace non attribué dans l'espace de partitionnement. Comment ?</li>
+	<li>Un noeud apparaissant dans un anneau de niveau supérieur se trouve forcément dans les anneaux de niveau inférieur.</li>    
+</ul>
+	
+<p>Une donnée insérée dans SkipTree est associée à une <em>clé multidimensionnelle</em>, un ensemble de paires clé-valeur. Ces paires clé-valeur doivent identifier la donnée à insérer en décrivant au mieux ses caractéristiques intrinsèques. Comme une donnée est constituée de valeurs, le choix des clés peut être immédiat. Par exemple : si la donnée est une photographie, sa clé multidimensionnelle pourrait être composée de chacun de ses champs EXIF (voire de l'image elle-même).</p>
+
+<br />
+
+<p>L'overlay SkipTree suppose <em>qu'étant donné un point, un noeud est capable d'identifier si le noeud responsable de ce point se trouve à sa droite ou à sa gauche</em>. Ceci implique que la clé multidimensionnelle accompagnant une donnée soit définie pour chacune des paires clé-valeur (c'est-à-dire pour les k-dimensions d'une clé à k-dimensions) gérées par les noeuds rencontrés lors de l'acheminement de ce point. Si ce n'était le cas, les noeuds ne pourraient déterminer la direction vers laquelle acheminer certaines requêtes.</p>
+
+<p>Le point d'achoppement réside dans le fait qu'une donnée puisse être associée à une clé multidimensionnelle partielle, c'est-à-dire une clé multidimensionnelle comprenant peu de dimensions. Dans ce cas, il arrivera que les hyperplans de partitionnement ne puissent être utilisées pour orienter efficacement la requête en la limitant à des régions déterminées de l'overlay. La requête devra alors être adressée à l'ensemble des noeuds se trouvant dans ce sous-arbre de partitionnement.</p>
+
+<br />
+
+<p>L'ensemble de l'espace multidimensionnel est réparti entre les noeuds présents dans l'overlay. Lorsqu'un nouveau noeud souhaite rejoindre l'overlay, il doit obtenir, depuis un des noeuds présents dans la structure, une partie de cet espace multidimensionnel. Le noeud contacté doit donc subdiviser l'espace multidimensionnel sous sa responsabilité. Lors de la subdivision de son espace multidimensionnel, un noeud peut chercher à rencontrer deux objectifs :</p>
+<ul>
+	<li>Répartir équitablement les données sous sa responsabilité ;</li>
+	<li>Employer les dimensions selon une distribution uniforme.</li>
+</ul>
+
+<p>En cherchant à répartir équitablement les données entre un noeud et un nouveau noeud, la charge des noeuds sera équilibrée. Cette charge restera équilibrée aussi longtemps que les modifications (ajouts ou suppressions) dans ce sous-espace multidimensionelle seront limitées. Dans le cas où on cherche à distribuer uniformément les paritions entre les dimensions, il existe une indépendance entre les données et les partitionnements. Cependant, cette solution n'offre aucune garantie quant à la répartition des données entre les noeuds.</p>
+
+<p>La méthode de partitionnement proposée par SkipTree propose de distribuer plus ou moins uniformément les dimensions. Elle privilégie, nénamoins, les <em>premières dimensions</em>. Ces dernières sont considérées comme étant plus discriminantes. Si la distribution des données prises en charge par l'overlay est à peu près connue, il est souhaitable d'associer les premières dimensions aux clés les plus populaires, celles le plus largement définies.</p>
+
+<p class="not_verified">Comme toutes les données sous la responsabilité d'un noeud sont définies pour toutes les dimensions intervenants dans les partitionnements de ce noeud, que se passe t-il lorsqu'un noeud utilise une nouvelle dimension pour réaliser un nouveau partitionnement ? Faut-il ajouter cette nouvelle dimension aux données ?</p>
+
+<br />
+
+<p>Les valeurs des domaines sur lesquels sont définies les clés multidimensionnelles doivent être comparables <code>lt</code>, <code>eq</code>, <code>eq</code>.</p>
+
+<p>Lors d'un partitionnement, la valeur choisie pour l'équation appartient à un domaine. Cette valeur peut être générée ou choisie parmi des valeurs disponibles. La première solution impose l'usage d'un générateur de valeur pour le domaine. La seconde solution suppose que le noeud responsable du partitionnement ait déjà sous sa responsabilité des données parmi lesquelles il pourra choisir une valeur. Dès lors, tant qu'un noeud ne gère pas de données, il sera incapable d'acceuillir des nouveaux noeuds.</p>
+
+	<h3>Localité</h3>
+
+<p>Une distinction est faite entre la <b>localité de routage</b> et la <b>localité de contenu</b>.</p>
+
+<h4>Localité de routage</h4>
+
+<p>Les noeuds d'un overlay SkipNet sont chacun caractérisés par un <em>identifiant numérique</em> et un <em>identifiant dénominatif</em>. L'<em>identifiant numérique</em> indique les <em>anneaux</em> du réseau SkipNet auxquels le noeud appartient tandis que l'<em>identifiant dénominatif</em> influence la disposition du noeud sur ces <em>anneaux</em>.</p>
+
+<p>En choisissant pour les noeuds des <em>identifiants dénominatifs</em> appropriés (par exemple : en les préfixant d'un nom de domaine), il est possible d'influencer leur disposition sur les <em>anneaux</em> et donc leur voisinage. Ce faisant, SkipNet peut garantir une localité de routage.
+
+<p>Une idée intuitive sur l'exactitude de la localité de routage : les noeuds de chaque <em>anneau</em> sont organisés selon leur <em>identifiant dénominatif</em>. La procédure de routage par <em>identifiant dénominatif</em> interdit qu'un message soit envoyé à un noeud situé après la destination recherchée. Dès lors, tous les noeuds rencontrés pendant la procédure de routage possèdent un <em>identifiant dénominatif</em> compris entre celui de la source et de la destination. Si la source et la destination appartiennent à un même domaine, alors les messages ne seront acheminés qu'à travers des noeuds de ce domaine.</p>
+
+<p>Pour une localité de routage correcte, le choix des <em>identifiants dénominatifs</em> doit respecter des règles.</p>
+<ul>
+	<li>Aucun <em>identifiant dénominatif</em> ne peut être généré de manière aléatoire.</li>
+	<li>Aucun <em>identifiant dénominatif</em> d'un domaine ne peut être être préfix d'un autre domaine.</li>
+	<li>...</li>
+</ul>
+
+<p>L'overlay SkipTree reprend une large partie du fonctionnement de SkipNet et le lien entre ces deux systèmes s'appuie sur l'<em>identifiant dénominatif</em>. SkipTree impose que cet identifiant soit <em>l'ordre dans lequel les noeuds apparaissent dans les feuilles de l'arbre de partitionnement depuis la gauche vers la droite</em>. L'emplacement dans l'arbre de partitionnement, l'<em>identifiant de partitionnement</em>, est calculé par le noeud contacté au moment du raccordement à l'overlay. </p>
+
+<p>Si l'<em>identifiant dénominatif</em> pouvait servir à assurer la localité des noeuds dans SkipNet, la contrainte imposée par SkipTree sur cet identifiant ne le permet plus.</p>
+
+<p>De manière plus précise. La contrainte portant sur les <em>identifiants dénominatifs</em> définie par les créateurs de SkipTree n'est qu'un moyen d'atteindre un objectif précis : les noeuds gérant des partitions successives de l'arbre de partitionnement doivent se succéder dans l'<em>anneau</em> de niveau 0. Cette règle est à la base du système de routage utilisé dans SkipNet et largement réutilisé dans SkipTree.</p>
+
+<p>Pour maintenir une localité de routage au sein de SkipTree, il faudrait que le noeud contacté par le nouveau noeud lors du raccordement à l'overlay SkipTree soit <em>proche, local</em> de ce nouveau noeud.</p>
+<ul>
+	<li>
+		<p>Une solution consiste à enrichir le <em>composant de bootstrap</em> de façon à ce qu'il connaisse la topologie complète du réseau ou soit capable de déterminer à priori la <em>localité</em> entre un nouveau noeud et les noeuds déjà <em>connectés</em>.</p> 
+		<p>Cette première solution ne requiert pas de modification de l'overlay SkipTree. Par contre, elle complexifie singulièrement le <em>composant de boostrap</em>. Comment peut-il connaitre l'ensemble de la topologie ? Comment peut-il déterminer les localités entre noeuds ? Comment suit-il les connexions et déconnexions des noeuds ?</p>
+	</li>
+	<li>
+		<p>Une autre solution consiste à relacher la contrainte imposée par SkipTree sur l'<em>identifiant de partitionnement</em> et l'<em>identifiant dénominatif</em>. Le principe est de trouver le noeud local qu'un nouveau noeud doit contacter. 
+
+<p>Si les <em>identifiants dénominatifs</em> sont choisis pour satisfaire la localité de routage propre à SkipNet, le noeud le plus local d'un nouveau noeud (a) peut être contacté par un routage sur base de l'<em>identifiant dénominatif</em> du nouveau noeud ; (b) peut être un des deux voisins directs du nouveau noeud (noeud de gauche ou de droite dans l'<em>anneau</em> de niveau 0) si les liens SkipNet ont été construits. Pour rejoindre l'overlay SkipTree, le nouveau noeud contacte alors le noeud local qu'il a déterminé. </p>
+		<p>Cette seconde solution préserve la simplicité du <em>composant de boostrap</em>. Une liste de noeuds <em>connectés</em> remplira parfaitement ce rôle. Néanmoins, elle suppose une définition correcte et respectée des <em>identifiants dénominatifs</em>. Dans une implémentation de type (b), cette solution nécessite que le nouveau noeud renvoie son statut mis-à-jour à l'ensemble de ses liens SkipNet.</p>
+	</li>
+</ul>
+
+<h4>Localité de contenu</h4>
+
+<p>La localité de contenu suppose que des données puissent être attribuées à un des noeuds locaux. Il doit donc être possible de placer arbitrairement des données sur des noeuds.</p>
+
+<p>Dans SkipTree, une donnée caractérisée par des dimensions sera gérée par le noeud responsable de l'espace multidimensionel auquel appartient cette donnée. Dans la mesure où l'espace mutlidimensionnel sous la reponsabilité d'un noeud est appellé à évoluer au gré des arrivées de nouveaux noeuds, la localité de contenu ne semble pas être transposable à l'overlay SkipTree.</p>
+
+	<h3>Routage</h3>
+
+<p>Une "Range Query" efficace suppose l'existence de localité entre données : des données semblables se situent à des emplacements proches. Dès lors une "Range Query" portant sur des attributs non définis dégradent les performances de l'opération. Dans ce cas, les propriétés de localité entre données sont sans effets.</p>
+
+	<ul>
+		<li>Un noeud interrogé dans le cadre d'un "Range Query" <b>doit</b> répondre. En effet, l'auteur de la question doit pouvoir déterminer si tous les noeuds ont répondu.</li>
+	</ul>
+
+	<h3>Requêtes</h3>
+
+	<h4>Distinction des cas</h4>
+
+<p>Les différents types de requêtes se définissent par les relations entre des ensembles de dimensions : les dimensions propres à une donnée et les dimensions propres aux CPEs manipulant la requête.</p>
+
+	<ol>
+		<li>Ddim = Cdim</li>
+		<li>Ddim ⊋ Cdim (Ddim ⋂ Cdim = Cdim ∧ Ddim \ Cdim ≠ ∅)</li>
+		<li>Ddim ⊈ Cdim (Ddim ⋂ Cdim ⊈ Cdim ∧ Ddim ⋂ Cdim ≠ ∅)</li>
+		<li>Ddim ⋂ Cdim = ∅</li>
+	</ol>
+
+<p>Le cas 1 correspond au comportement prévu par l'overlay SkipTree. Le cas 2, en respectant les conditions posées dans le cas 1 (à savoir que toutes les dimensions nécessaires au routage soient précisées dans la requête), est également gérée par SkipTree. Par contre, les cas 3 et 4 ne peuvent être directement gérés par SkipTree.</p>
+
+<p>Dans les cas 3 et 4, une (des) dimension(s) nécessaire(s) au routage est (sont) absente(s) des informations accompagnant la donnée. Dès lors, SkipTree sera incapable de déterminer le noeud responsable de cette donnée.</p>
+
+<p>Une recherche intégrant une (des) dimension(s) non définie(s) peut être interprétée de deux façons : (a) la recherche désigne les données comprennant exactement les dimensions définies dans la requête ou (b) la requête désigne les données comprennant au minimum les dimensions définies dans la requête. Les requêtes intégrants des dimensions non définies seront considérées différement selon ces deux cas.</p>
+
+<p>Dans la situation présente, seul le cas (b) nous intéresse. Celui-ci implique la mise en place d'un mécanisme pour toucher tous les noeuds qui contiennent des données satisfaisant les dimensions définies dans la requête sans que les dimensions non définies n'entravent le routage.</p>
+
+<p>Une idée simple est d'ajouter à une <em>requête partiellement routable</em> les dimensions qui lui permettront d'être routée correctement. Toutefois, cet ajout ne doit pas avoir d'influence sur les noeuds normalement intéressés par cette <em>requête partiellement routable</em>. La valeur a attribué à chacune des dimensions ajoutées doit donc désigner l'ensemble des noeuds de l'overlay, c'est-à-dire l'intervale <code>]-∞, +∞[</code>.</p>
+
+<p>En appliquant cette idée, il n'existe théoriquement plus de <em>dimensions non définies</em>. Les relations entre ensembles de dimensions ne constituent plus une véritable disctinction de cas. Il n'existe plus qu'une distinction basée sur les requêtes élémentaires : insertion, recherche simple et recherche par intervalle.</p>
+
+	<h4>Insertion</h4>
+
+<p>Un noeud ayant reçu une demande d'insertion consulte ses CPEs. Il parcourt les <em>équations</em> le composant et vérifie si le point satisfait celles-ci. Le noeud détermine ainsi si la région dont il est responsable devrait gérer le point.</p>
+
+<p>L'ensemble de l'espace multidimensionnel est réparti entre tous les noeuds. Dès lors, un point qui ne satisfait pas les équations d'un noeud est nécessairement sous la responsabilité d'un autre noeud. Ainsi, lors d'une demande d'insertion, si un noeud est responsable de la donnée à insérer, il le mémorise sinon il transmet la demande d'insertion à son voisin le plus approprié.</p>
+
+<p>Le choix du voisin le plus approprié se base également sur les CPEs. Si un noeud n'est pas responsable d'un point, il interroge ses voisins en commençant par les plus éloignés. Le noeud vérifie, pour chacun d'eux, si celui-ci gère le point et obtient la direction dans laquelle devrait être orientée la requête (grâce à la distribution gauche/droite entre les hyperplans de partitionnement). Le noeud local envoie alors la requête au voisin le plus éloigné ne se trouvant pas après la destination.</p>
+
+<p>Il arrive que la requête d'insertion n'intègre pas toutes les dimensions nécessaires aux noeuds pour réaliser le routage (cas 3 et 4 décrits ci-dessus). Une <em>valeur virtuelle</em> doit être attribuée à la dimension non définie du noeud. Ceci permettra de déterminer le sous espace mutlidimensionnel gérant cette donnée.</p>
+
+<p>La <em>valeur virtuelle</em> doit respecter certaines règles (dont la validité doit pouvoir être vérifiée pour l'ensemble des domaines sur lesquels pourraient être définies les dimensions) : </p>
+<ul>
+	<li>La <em>valeur virtuelle</em> doit être ordonnable. Elle doit pouvoir être comparée dans les équations des CPEs.</li>
+	<li>La <em>valeur virtuelle</em> doit être distinguable. Elle n'existe pas et ne doit pas être interprétée comme une donnée.</li>
+</ul>
+
+<p>Techniquement, la <em>valeur virtuelle</em> peut être une valeur particulière comme <code>None</code> mais celle-ci doit alors être rendue ordonnable. Autrement, une véritable valeur du domaine (propre à la dimension non définie) peut également être choisie et être marquée comme <em>virtuelle</em>.</p>
+
+<p>Si la solution de "choisir une valeur dans les valeurs du domaine" est retenue, il peut être intéressant que la valeur choisie fasse partie des CPEs du noeud local. Puisque la prise en compte d'une dimension suppose qu'un <em>split</em> sur cette dimension existe parmi les CPEs du noeud, une telle valeure peut toujours être trouvée. Par ailleurs, le fait de choisir une valeur du noeud local garantit une localité de contenu vis-à-vis du noeud contacté pour l'insertion : les données seront placées soit sur le noeud local (si la valeur est incluse), soit sur un de ses voisins directs (si la valeur est exclue).</p>
+
+	<h4>Recherche simple</h4>
+
+<p>Le routage d'une <em>recherche simple</em> est identique à celui appliqué à une requête d'insertion. Le routage d'une <em>recherche simple</em> diffère toutefois dans la réaction à donner lorsqu'une des dimensions nécessaires au routage n'est pas définie. La solution proposée dans le point traitant de la disctinction des cas règle ce problème.</p>
+
+	<h4>Recherche par intervalle</h4>
+
+<p>Une <em>recherche par intervalle</em> peut viser les données appartenant à plusieurs noeuds. Le système de routage doit donc être capable de gérer l'envoi à de multiple destinataires. Par ailleurs, les messages envoyés à chacun des destinataires risquent d'être altérés : les requêtes d'intervalle doivent être contenues entre des limites pour éviter que les noeuds concernés ne se transmettent indéfiniment les requêtes entre eux.</p>
+
+<p>Finalement, il faut également que les requêtes se propagent vers les extrémités de l'arbre de partitionnement plutôt que vers le coeur. Ceci assure que même les noeuds les plus lointains finiront par être touchés par les requêtes.</p>
+
+<p>Une recherche par intervalle peut impliquer plusieurs noeuds. Un noeud local, concerné ou non par l'intervalle de recherche, doit donc soumettre la requête à ses voisins.</p>
+
+<p>Pour sélectionner ses voisins, le noeud local parcourt ceux-ci en commençant par les plus éloignés. Ceci lui permet de relever les voisins concernés par une partie de l'intervalle de recherche ainsi que leur position vis-à-vis de cet intervalle. Une sous-requête sera alors envoyée à tous les noeuds concernés ainsi qu'à celui se trouvant au plus près de l'intervalle sans le dépasser (et ceci même si le noeud n'est pas concerné). En effet, il peut exister des noeuds concernés par l'intervalle de recherche entre celui qui est "le plus près de l'intervalle sans le dépasser" et "le dernier noeud concerné par l'intervalle".</p>
+
+<p>Un noeud est concerné par une partie de l'intervalle s'il est directement responsable de cette partie de l'intervalle et/ou si des noeuds responsables d'une partie de cet intervalle se trouvent entre lui et le noeud situé un niveau plus loin.</p>
+
+<p>Puisque le parcours des noeuds s'effectue des niveaux les plus élevés aux moins élevés, la sous-requête qu'un noeud reçoit est compris entre l'identifiant de partitionnement de ce noeud et celui du noeud de niveau directement plus élevé. Il est certain qu'aucune partie d'intervalle ne pourra être oubliée.</p>
+
+<p>Rappellons que l'espace multidimensionnel est partagé entre tous les noeuds. Comme ce partage se fait de manière hiérarchique, un noeud est toujours à même de déterminer si <em>une partie de l'espace multidimensionnel</em> se situe à sa gauche ou à sa droite. Il n'existe donc pas de problème de direction dans le routage par intervalle.</p> 
+
+<p>Par exemple, un noeud pour lequel une dimension intervenant dans une requête n'est pas spécifiée peut router correctement une requête. Dans cette situation, deux cas peuvent être observés : soit la requête satisfait les dimensions du noeud, soit la requête ne satisfait pas les dimensions du noeud. 
+<ul>
+	<li>Si la requête satisfait les dimensions du noeud alors ce noeud gère cette requête. Les dimensions supplémentaires spécifiées dans la requête interviendront peut-être dans un futur <em>split</em> de l'espace multidimensionnel du noeud.</li>
+	<li>Si la requête ne satisfait pas les dimensions du noeud alors ce dernier aura déterminé lors de la vérification de responsabilité la direction dans laquelle orienter cette requête.</li>
+</ul>
+</p>
+
+</body>
+</html>

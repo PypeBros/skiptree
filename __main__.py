@@ -221,7 +221,10 @@ class Val(object):
     def val(self):
         return self.__val
 
-import copy
+
+from equation import Component
+from equation import CompCounter
+from equation import Dimension
 
 if __name__ == "__main__":
 
@@ -234,24 +237,25 @@ if __name__ == "__main__":
         else:
             main()
     else:
-        print("*NFO : Test the array appending and x.")
 
-        #TODO: append is not the good function.
+        print("Place to test little code.")
 
-        datas = ['a', 'b', ['c']]
-        print(datas)
-        print(len(datas))
+        dim = Dimension("address")
 
-        p_data = ['z']
-        print(p_data)
+        compA = Component(dim, 0)
+        compB = Component(dim, 1)
+        compC = None
 
-        a, b, c = datas
-        c.extend(p_data)
-        datas = [a, b, c]
-        print(datas)
+        counter = CompCounter(dim)
+        counter.add(compA, "0")
+        counter.print_debug()
 
         print("---- ---- ---- ---- ---- ---- ---- ----")
 
+        counter.add(compB, "1")
+        counter.add(compA, "9")
+        counter.print_debug()
 
+        print("---- ---- ---- ---- ---- ---- ---- ----")
 
 
