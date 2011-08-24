@@ -175,7 +175,7 @@ class Dimension(object):
         return self.dimension.__hash__()
 
     #
-    # Overwrite
+    # Overwritten
 
     def __repr__(self):
         return str(self.__dimension)
@@ -235,7 +235,7 @@ class Component(object):
         return self.value.__hash__()
 
     #
-    # Overwrite
+    # Overwritten
 
     def __repr__(self):
         return str(self.__value) + " (" + str(self.__dimension) + ")"
@@ -340,8 +340,6 @@ class DataStore(object):
 
 class CompCounter(object):
 
-    #TODO: Write description for the CompCounter.
-
     def __init__(self, dimension):
         self.__dimension = dimension
 
@@ -352,9 +350,8 @@ class CompCounter(object):
         self.__changed = True
 
         self.__cut_value = None
-        self.__side_ratio = None
-        self.__nb_virtual_left = 0
-        self.__nb_virtual_right = 0
+        self.__data_left = list()
+        self.__data_right = list()
 
     #
     # Properties
@@ -403,9 +400,6 @@ class CompCounter(object):
 
     def add(self, p_comp, p_data):
         """Add a component in this CompCounter."""
-
-        #TODO: Change the signature.
-
         self.__changed = True
         self.__nb_value += 1
         if(p_comp != None and not p_comp.virtual):
@@ -435,12 +429,6 @@ class CompCounter(object):
             # The component is virtual: should be process differently.
             self.__virtual.append(p_data)
 
-    def print_debug(self):
-        for i in range(len(self.__constrained)):
-            comp, freq, datas = self.__constrained[i]
-            print(i, ".", freq, "*", comp)
-            print(i, ".", "Data:", datas)
-
 
     def __compute_best_partition_values(self):
         """
@@ -458,22 +446,52 @@ class CompCounter(object):
             (self.__cut_value, nb_cut_left) = self.__constrained[0]
             nb_cut_right = (self.size - self.nb_virtual) - nb_cut_left
 
-            self.__nb_virtual_left, self.__nb_virtual_right, nb_virtual = self.__distribute(nb_cut_left, nb_cut_right, self.nb_virtual)
+            nb_virtual_left, nb_virtual_right, nb_virtual = self.__distribute(nb_cut_left, nb_cut_right, self.nb_virtual)
             assert nb_virtual == 0
 
-            self.__side_ratio = fractions.Fraction(nb_cut_left + self.__nb_virtual_left, nb_cut_right + self.__nb_virtual_right)
+            self.__separate_data(nb_virtual_left, nb_virtual_right)
 
             # Reset the state of distribution.
             self.__constrained.sort(key=lambda m_list: m_list[0])
             self.__changed = False
 
-            #TODO: add the generation of the data list.
+        return [self.__cut_value, fractions.Fraction(len(self.__data_left, self.__data_right))]
 
-        return [self.__cut_value, self.__side_ratio]
+
+    def __separate_data(self, nb_virtual_left, nb_virtual_right):
+        # Separate the constrained data.
+        for comp, freq, datas in self.__constrained:
+            if(comp <= self.__cut_value):
+                # Add the data to the left part.
+                prev_size = len(self.__data_left)
+                self.__data_left.extend(datas)
+                assert len(self.__data_left) == prev_size + freq
+            else:
+                # Add the data to the right part.
+                prev_size = len(self.__data_right)
+                self.__data_right.extend(datas)
+                assert len(self.__data_right) == prev_size + freq
+
+        # Separate the virtual data.
+        assert len(self.__virtual == nb_virtual_left + nb_virtual_right)
+        for i in range(len(self.__virtual)):
+            virtual = self.__virtual[i]
+            if(i < nb_virtual_left):
+                #Add the data to left part.
+                prev_size = len(self.__data_left)
+                self.__data_left.append(virtual)
+                assert len(self.__data_left) == prev_size + 1
+
+            elif (nb_virtual_left <= i and i < nb_virtual_left + nb_virtual_right):
+                #Add the data to right part.
+                prev_size = len(self.__data_right)
+                self.__data_right.append(virtual)
+                assert len(self.__data_right) == prev_size + 1
 
     @staticmethod
     def __distribute(left, right, how_mutch):
         """Distribute 'how_mutch' between left and right in order to obtain equity for theses two sides."""
+        #TODO: Verify-me !
         while (0 < how_mutch):
             assert how_mutch != 0
             if (left == right):
@@ -502,6 +520,15 @@ class CompCounter(object):
     def __half_ratio_distance(value, total):
         """Compute the ratio distance from 0.5."""
         return round(abs(0.5 - value / total), 8)
+
+    #
+    # Debug methods
+
+    def print_debug(self):
+        for i in range(len(self.__constrained)):
+            comp, freq, datas = self.__constrained[i]
+            print(i, ".", freq, "*", comp)
+            print(i, ".", "Data:", datas)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -676,14 +703,6 @@ the Node that delimits the area managed by the Node."""
 
     #
     #
-
-    def next_dimensions(self):
-        """Return a list of dimension in the order it should be chosen."""
-        #TODO: not used anymore.
-        result = list(self.__dim_count.items())
-        result.sort(key=lambda pair: pair[0])                   # Sort on secondary key 
-        result.sort(key=lambda pair: pair[1], reverse=True)     # Sort on primary key
-        return result
 
     def get_range(self, dimension):
         """Return the dimension's value range managed by the local node."""
