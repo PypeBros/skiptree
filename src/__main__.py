@@ -258,6 +258,8 @@ if __name__ == "__main__":
 
         print("---- ---- ---- ---- ---- ---- ---- ----")
 
+        x = counter.best_bound_value
+        print(x)
 
 
 

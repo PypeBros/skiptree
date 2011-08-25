@@ -364,7 +364,7 @@ class CompCounter(object):
     @property
     def best_bound_value(self):
         """Return the best value for a new bound."""
-        return self.__compute_best_partition_values()[0]
+        return self.__compute_best_partition_values()
 
     @property
     def best_bound_ratio(self):
@@ -375,7 +375,14 @@ class CompCounter(object):
         If the left side contains more elements than the right one, the value will be > 1.
         If the right side contains more elements than the left one, the value will be < 1.
         """
-        return self.__compute_best_partition_values()[1]
+        assert len(self.__data_left) > 0 or len(self.__data_right) > 0
+
+        #TODO: doesn't work !
+
+        left_side = max(1, len(self.__data_left))
+        right_side = max(1, len(self.__data_right))
+
+        return fractions.Fraction(left_side, right_side)
 
     #
     #
@@ -400,13 +407,15 @@ class CompCounter(object):
 
     def add(self, p_comp, p_data):
         """Add a component in this CompCounter."""
+        assert p_comp.dimension == self.dimension
+
         self.__changed = True
         self.__nb_value += 1
         if(p_comp != None and not p_comp.virtual):
-            # The component is correctly defined: could be added.
-            added = False
+            # The component is correctly defined: could be added.            
             self.__constrained.sort(key=lambda m_list: m_list[0])   #Precondition
 
+            added = False
             for i in range(len(self.__constrained)):
                 comp, freq, datas = self.__constrained[i]
 
@@ -429,36 +438,34 @@ class CompCounter(object):
             # The component is virtual: should be process differently.
             self.__virtual.append(p_data)
 
-
     def __compute_best_partition_values(self):
-        """
-        Return a list [best partition value, share between left and right, number of free elements left and right].
-        """
+        """Return the best partition value."""
         if(self.__nb_value <= 0):
             raise ValueError()
 
         if(self.__changed):
             # Sort on the nearest "50% ratio" cut.
-            self.__constrained.sort(key=lambda m_list: m_list[0], reverse=random.randint(0, 1))
             self.__constrained.sort(key=lambda m_list: CompCounter.__half_ratio_distance(m_list[1], self.nb_constrained))
 
-            # (bound_value of the best bound, the number of left elements if that bound is chosen)
-            (self.__cut_value, nb_cut_left) = self.__constrained[0]
+            # [bound_value of the best bound, the number of left elements if that bound is chosen, x]
+            [self.__cut_value, nb_cut_left, unused] = self.__constrained[0]
             nb_cut_right = (self.size - self.nb_virtual) - nb_cut_left
 
-            nb_virtual_left, nb_virtual_right, nb_virtual = self.__distribute(nb_cut_left, nb_cut_right, self.nb_virtual)
-            assert nb_virtual == 0
-
+            nb_virtual_left, nb_virtual_right = self.__compute_virtual_distribution(self.nb_virtual, nb_cut_left, nb_cut_right)
             self.__separate_data(nb_virtual_left, nb_virtual_right)
 
             # Reset the state of distribution.
             self.__constrained.sort(key=lambda m_list: m_list[0])
             self.__changed = False
 
-        return [self.__cut_value, fractions.Fraction(len(self.__data_left, self.__data_right))]
+            # Post-condition
+            assert (len(self.__constrained) < 2 or (len(self.__data_left) >= 1 and len(self.__data_right) >= 1))
 
+        return self.__cut_value
 
     def __separate_data(self, nb_virtual_left, nb_virtual_right):
+        assert len(self.__virtual) == nb_virtual_left + nb_virtual_right
+
         # Separate the constrained data.
         for comp, freq, datas in self.__constrained:
             if(comp <= self.__cut_value):
@@ -472,8 +479,10 @@ class CompCounter(object):
                 self.__data_right.extend(datas)
                 assert len(self.__data_right) == prev_size + freq
 
+            print("SET LF: ", self.__data_left)
+            print("SET RG: ", self.__data_right)
+
         # Separate the virtual data.
-        assert len(self.__virtual == nb_virtual_left + nb_virtual_right)
         for i in range(len(self.__virtual)):
             virtual = self.__virtual[i]
             if(i < nb_virtual_left):
@@ -488,33 +497,36 @@ class CompCounter(object):
                 self.__data_right.append(virtual)
                 assert len(self.__data_right) == prev_size + 1
 
+        assert self.size == len(self.__data_left) + len(self.__data_right)
+
     @staticmethod
-    def __distribute(left, right, how_mutch):
-        """Distribute 'how_mutch' between left and right in order to obtain equity for theses two sides."""
-        #TODO: Verify-me !
+    def __compute_virtual_distribution(how_mutch, left_cut, right_cut):
+        """Compute how 'how_mutch' should be distributed to obtain equity between sides."""
+        left_total = left_cut
+        right_total = right_cut
         while (0 < how_mutch):
             assert how_mutch != 0
-            if (left == right):
+            if (left_total == right_total):
                 if(how_mutch % 2 == 1):
                     if(random.randint(0, 1) == 0):
-                        left = left + 1
+                        left_total = left_total + 1
                     else:
-                        right = right + 1
-                left = left + (how_mutch // 2)
-                right = right + (how_mutch // 2)
+                        right_total = right_total + 1
+                left_total = left_total + (how_mutch // 2)
+                right_total = right_total + (how_mutch // 2)
                 how_mutch = 0
             else:
-                diff = abs(left - right)
+                diff = abs(left_total - right_total)
                 new_add = min(how_mutch, diff)
-                if (left < right):
-                    left = left + new_add
+                if (left_total < right_total):
+                    left_total = left_total + new_add
                 else:
-                    assert left > right
-                    right = right + new_add
+                    assert left_total > right_total
+                    right_total = right_total + new_add
                 how_mutch = how_mutch - new_add
 
         assert how_mutch == 0
-        return [left, right, how_mutch]
+        return [max(0, left_total - left_cut), max(0, right_total - right_cut)]
 
     @staticmethod
     def __half_ratio_distance(value, total):
