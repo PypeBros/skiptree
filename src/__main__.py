@@ -261,5 +261,7 @@ if __name__ == "__main__":
         x = counter.best_bound_value
         print(x)
 
+        y = counter.ratio_diff_between_side
+        print(y)
 
 

@@ -319,23 +319,13 @@ class DataStore(object):
             raise ValueError()
 
         val_counters = self.__data_by_dimension.values()
-        val_counters.sort(key=lambda val_counter: DataStore.__ratio_distance(val_counter.best_bound_ratio))
+        val_counters.sort(key=lambda val_counter: val_counter.ratio_diff_between_side)
 
         return (val_counters[0].dimension, val_counters[0].best_bound_value)
 
     def __len__(self):
         """Return the number of data managed by the DataStore."""
         return len(self.__data)
-
-    @staticmethod
-    def __ratio_distance(value):
-        """
-        Return the distance between the elements going to left and right sides. The lowest value is the best. 
-        
-        When the value is equal to 1, it means that equity between sides have been reach. 
-        When the value is lower or higher than 1, it means that one of the sides contains more elements.
-        """
-        return abs(1.0 - float(value))
 
 
 class CompCounter(object):
@@ -367,22 +357,14 @@ class CompCounter(object):
         return self.__compute_best_partition_values()
 
     @property
-    def best_bound_ratio(self):
-        """
-        Return the distribution between left and right sides if the value for a new bound is chosen.
-        
-        If the left and right sides contains the same number of elements the value will be 1.
-        If the left side contains more elements than the right one, the value will be > 1.
-        If the right side contains more elements than the left one, the value will be < 1.
-        """
+    def ratio_diff_between_side(self):
+        """Return the difference percentage between sides if the 'best_bound_value' is chosen."""
         assert len(self.__data_left) > 0 or len(self.__data_right) > 0
 
-        #TODO: doesn't work !
+        left_side = len(self.__data_left) / self.size
+        right_side = len(self.__data_right) / self.size
 
-        left_side = max(1, len(self.__data_left))
-        right_side = max(1, len(self.__data_right))
-
-        return fractions.Fraction(left_side, right_side)
+        return abs(left_side - right_side)
 
     #
     #
@@ -440,7 +422,7 @@ class CompCounter(object):
 
     def __compute_best_partition_values(self):
         """Return the best partition value."""
-        if(self.__nb_value <= 0):
+        if(self.size <= 0):
             raise ValueError()
 
         if(self.__changed):
