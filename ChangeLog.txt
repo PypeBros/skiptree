@@ -1,6 +1,9 @@
 
+Fix the add in the DataStore.
+Fix the computing of the best partition value.
 
-Temporary Commit:
+Html: Ajout dans la recherche simple.
+Html: Ajout dans l'insertion de point.
+Html: Correction dans l'insertion de point.
+Html: Clarification sur la classification des cas.
 
-Change the LocalEvent processing for multiple sends.
-Remove dead code.

@@ -232,7 +232,7 @@ class RouteByPayload(RouteMessage):
 
 class RouteByCPE(RouteMessage):
 
-    #TODO: The RouteByCPE SpacePart should be a copy of the one from payload.
+    #TODO: The RouteByCPE SpacePart should be a copy of the one from PayLoad.
 
     def __init__(self, payload):
         RouteMessage.__init__(self, payload)

@@ -1,6 +1,5 @@
 # System imports
 import copy
-import fractions
 import logging
 import math
 import random
@@ -297,21 +296,31 @@ class DataStore(object):
         self.__data = list()
         self.__data_by_dimension = dict()
 
-    def add(self, data, space_part):
+    def add(self, space_part, data):
         """Add a data in the DataStore."""
-        self.__data.append(data)
-
         # Detect new dimension.
         dim_cpe = set(self.__data_by_dimension.keys())
         dim_msg = space_part.dimensions
+        dim_new = dim_cpe.difference(dim_msg)
 
-        dim_unknown = dim_cpe.difference(dim_msg)
-        for dim in dim_unknown:
-            self.__data_by_dimension[dim] = CompCounter(dim)
+        # Verify new space_part : all dimension must be defined.
+        for dim in dim_new:
+            if (space_part.get_component(dim) == None):
+                raise ValueError()
 
-        # Add the data into the counters.
+        self.__data.append((space_part, data))
+
+        # Add the data into the existing counters.
         for dim, valCounter in self.__data_by_dimension:
             valCounter.add(space_part.get_component(dim), data)
+
+        # Add new counters.
+        for dim in dim_new:
+            new_valCounter = CompCounter(dim)
+            for sp, dt in self.__data:
+                new_valCounter.add(sp.get_component(dim), dt)
+
+            self.__data_by_dimension[dim] = new_valCounter
 
     def get_partition_value(self):
         """Return a pair (best dimension, best partition value)."""
@@ -335,7 +344,7 @@ class CompCounter(object):
 
         self.__nb_value = 0
         self.__virtual = list()
-        self.__constrained = list()    # List of sub-lists. Sub-list is as followed "[value, frequency of that value, data related].
+        self.__constrained = list()    # List of sub-lists. Sub-list is as followed "[value, frequency of that value, [data related]].
 
         self.__changed = True
 
@@ -354,7 +363,7 @@ class CompCounter(object):
     @property
     def best_bound_value(self):
         """Return the best value for a new bound."""
-        return self.__compute_best_partition_values()
+        return self.__compute_best_partition_value()
 
     @property
     def ratio_diff_between_side(self):
@@ -389,8 +398,6 @@ class CompCounter(object):
 
     def add(self, p_comp, p_data):
         """Add a component in this CompCounter."""
-        assert p_comp.dimension == self.dimension
-
         self.__changed = True
         self.__nb_value += 1
         if(p_comp != None and not p_comp.virtual):
@@ -402,6 +409,7 @@ class CompCounter(object):
                 comp, freq, datas = self.__constrained[i]
 
                 if(p_comp < comp):
+                    # insert make a shift of the value standing after the inserting point.
                     self.__constrained.insert(i, [p_comp, 1, [p_data]])
                     added = True
                     break
@@ -413,20 +421,27 @@ class CompCounter(object):
                     break
 
             if(not added):
-                # When the p_comp is the highest value ever seen.
+                # The p_comp is the highest value ever seen.
                 self.__constrained.append([p_comp, 1, [p_data]])
 
         else:
             # The component is virtual: should be process differently.
             self.__virtual.append(p_data)
 
-    def __compute_best_partition_values(self):
+    def __compute_best_partition_value(self):
         """Return the best partition value."""
         if(self.size <= 0):
             raise ValueError()
 
+        # A new 'CompCounter' can only be created with a new point.
+        # Because a space part of a point have all his dimension defined.
+        # There is always at least one constrained data in a 'CompCounter'. 
+        assert self.nb_constrained >= 1
+
         if(self.__changed):
-            # Sort on the nearest "50% ratio" cut.
+            nb_cut_left, nb_cut_right = 0, 0
+
+            # Sort on the nearest "50% ratio" cut. Nearest ratio is the first.
             self.__constrained.sort(key=lambda m_list: CompCounter.__half_ratio_distance(m_list[1], self.nb_constrained))
 
             # [bound_value of the best bound, the number of left elements if that bound is chosen, x]
@@ -439,9 +454,6 @@ class CompCounter(object):
             # Reset the state of distribution.
             self.__constrained.sort(key=lambda m_list: m_list[0])
             self.__changed = False
-
-            # Post-condition
-            assert (len(self.__constrained) < 2 or (len(self.__data_left) >= 1 and len(self.__data_right) >= 1))
 
         return self.__cut_value
 
@@ -473,7 +485,7 @@ class CompCounter(object):
                 self.__data_left.append(virtual)
                 assert len(self.__data_left) == prev_size + 1
 
-            elif (nb_virtual_left <= i and i < nb_virtual_left + nb_virtual_right):
+            elif (nb_virtual_left <= i):
                 #Add the data to right part.
                 prev_size = len(self.__data_right)
                 self.__data_right.append(virtual)
