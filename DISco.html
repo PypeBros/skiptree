@@ -206,7 +206,7 @@
 
 <p>Imaginons une liste de noeuds dont la première position est occupée par le noeud le plus lointain et la dernière position par le noeud le plus proche. Pendant le parcours de cette liste seront sélectionnés les noeuds s'occupant de cet intervalle ainsi que les noeuds pour lesquels l'intervalle est située à gauche. Le parcours s'interrompt après l'ajout du noeud à la droite duquel il n'existe plus de noeuds concernés par l'intervalle. Ce dernier noeud doit être sélectionné qu'il soit ou non concerné par l'intervalle. En effet, il peut exister des noeuds intermédiaires entre lui et le noeud le précédant.</p>
 
-<p>Lorsqu'une requête d'intervalle est transmise à un noeud, son champ d'action doit être limitée à une partie des noeuds du SkipTree. Conformément au sens de propagation discuté plus haut, l'intervalle d'activité doit limiter le champ d'action d'un noeud à lui-même et à tous les éléments situés entre lui et le noeud de niveau directement supérieur.</p>
+<p>Lorsqu'une requête d'intervalle est transmise à un noeud, son champ d'action doit être limitée à une partie des noeuds du SkipTree. Conformément au sens de propagation discuté plus haut, l'intervalle d'activité doit limiter le champ d'action d'un noeud à lui-même et à tous les éléments situés entre lui (compris) et le noeud de niveau directement supérieur (non compris).</p>
 
 <p>Rappellons que l'espace multidimensionnel est partagé entre tous les noeuds. Comme ce partage se fait de manière hiérarchique, un noeud est toujours à même de déterminer si <em>une partie de l'espace multidimensionnel</em> se situe à sa gauche ou à sa droite. Il n'existe donc pas de problème de direction dans le routage par intervalle.</p>
 </body>

@@ -248,12 +248,14 @@ class SpacePart(object):
         """
         Initialize a SpacePart.
         
-        'coordinates' are supposed to be a map of Component.
-        The key of the dictionary is the 'dimension' of the 'component'.
+        'coordinates' are supposed to be a list of 'component'.
+        The list shouldn't contain two 'component' for the same 'dimension'.
         """
+        # A coordinate must be find easily : dictionary advised.
         self.__coordinates = {}
         if(coordinates != None):
-            self.__coordinates = copy.copy(coordinates)
+            for component in coordinates:
+                self.__coordinates[component.dimension] = component
 
     #
     # Properties
@@ -289,6 +291,20 @@ class SpacePart(object):
         self.__coordinates[dimension] = component
         return previous
 
+    #
+    # Debug methods
+
+    def print_debug(self):
+        i = 1
+        keys = list(self.__coordinates.keys())
+        keys.sort()
+
+        print("SpacePart")
+        for key in keys:
+            component = self.__coordinates.get(key)
+            print(" " + str(i) + ") " + str(component))
+            i = i + 1
+
 
 class DataStore(object):
 
@@ -301,7 +317,7 @@ class DataStore(object):
         # Detect new dimension.
         dim_cpe = set(self.__data_by_dimension.keys())
         dim_msg = space_part.dimensions
-        dim_new = dim_cpe.difference(dim_msg)
+        dim_new = dim_msg.difference(dim_cpe)
 
         # Verify new space_part : all dimension must be defined.
         for dim in dim_new:
@@ -311,7 +327,7 @@ class DataStore(object):
         self.__data.append((space_part, data))
 
         # Add the data into the existing counters.
-        for dim, valCounter in self.__data_by_dimension:
+        for dim, valCounter in self.__data_by_dimension.items():
             valCounter.add(space_part.get_component(dim), data)
 
         # Add new counters.
@@ -323,18 +339,35 @@ class DataStore(object):
             self.__data_by_dimension[dim] = new_valCounter
 
     def get_partition_value(self):
-        """Return a pair (best dimension, best partition value)."""
+        """Return a pair [best dimension, best partition value, data from left, data from right]."""
         if(len(self.__data_by_dimension) <= 0):
             raise ValueError()
 
-        val_counters = self.__data_by_dimension.values()
-        val_counters.sort(key=lambda val_counter: val_counter.ratio_diff_between_side)
+        # Sort the 'CompCounter' for the best split to be in first position.
+        comp_counters = list(self.__data_by_dimension.values())
+        comp_counters.sort(key=lambda val_counter: val_counter.nb_virtual)
+        comp_counters.sort(key=lambda val_counter: val_counter.ratio_diff_between_side)
 
-        return (val_counters[0].dimension, val_counters[0].best_bound_value)
+        best_one = comp_counters[0]
+
+        return [best_one.dimension, best_one.best_bound_value, best_one.data_left, best_one.data_right]
 
     def __len__(self):
         """Return the number of data managed by the DataStore."""
         return len(self.__data)
+
+    #
+    # Debug methods
+
+    def print_debug(self):
+        print("\r\nDataStore - BEG")
+        keys = list(self.__data_by_dimension.keys())
+        keys.sort()
+        for key in keys:
+            comp_counter = self.__data_by_dimension.get(key)
+            comp_counter.print_debug()
+        else:
+            print("DataStore - END")
 
 
 class CompCounter(object):
@@ -360,6 +393,9 @@ class CompCounter(object):
         """Return the dimension considered in this values counter."""
         return self.__dimension
 
+    #
+    #
+
     @property
     def best_bound_value(self):
         """Return the best value for a new bound."""
@@ -367,13 +403,30 @@ class CompCounter(object):
 
     @property
     def ratio_diff_between_side(self):
-        """Return the difference percentage between sides if the 'best_bound_value' is chosen."""
+        """
+        Return the difference percentage between sides if the 'best_bound_value' is chosen.        
+        A low value shows small difference between sides, a high value big difference between sides.          
+        """
+        self.__compute_best_partition_value()
         assert len(self.__data_left) > 0 or len(self.__data_right) > 0
+
 
         left_side = len(self.__data_left) / self.size
         right_side = len(self.__data_right) / self.size
 
         return abs(left_side - right_side)
+
+    @property
+    def data_left(self):
+        """Return the data from the left side."""
+        self.__compute_best_partition_value()
+        return self.__data_left
+
+    @property
+    def data_right(self):
+        """Return the data from the right side."""
+        self.__compute_best_partition_value()
+        return self.__data_right
 
     #
     #
@@ -400,43 +453,46 @@ class CompCounter(object):
         """Add a component in this CompCounter."""
         self.__changed = True
         self.__nb_value += 1
+
         if(p_comp != None and not p_comp.virtual):
             # The component is correctly defined: could be added.            
             self.__constrained.sort(key=lambda m_list: m_list[0])   #Precondition
 
+            i = 0
             added = False
-            for i in range(len(self.__constrained)):
-                comp, freq, datas = self.__constrained[i]
 
-                if(p_comp < comp):
-                    # insert make a shift of the value standing after the inserting point.
-                    self.__constrained.insert(i, [p_comp, 1, [p_data]])
-                    added = True
-                    break
+            while i < len(self.__constrained):
+                comp, left_sided, datas = self.__constrained[i]
 
-                elif(p_comp == comp):
-                    datas.extend(p_data)
-                    self.__constrained[i] = [comp, freq + 1, datas]
-                    added = True
-                    break
+                if(not added):
+                    if(p_comp < comp):
+                        # insert make a shift of the value standing after the inserting point.
+                        self.__constrained.insert(i, [p_comp, 1, [p_data]])
+                        added = True
+
+                    elif(p_comp == comp):
+                        datas.extend(p_data)
+                        self.__constrained[i] = [comp, left_sided + 1, datas]
+                        added = True
+
+                else:
+                    # Every element after an add must also be increased.
+                    self.__constrained[i] = [comp, left_sided + 1, datas]
+                i = i + 1
 
             if(not added):
                 # The p_comp is the highest value ever seen.
-                self.__constrained.append([p_comp, 1, [p_data]])
+                self.__constrained.append([p_comp, self.nb_constrained, [p_data]])
 
         else:
             # The component is virtual: should be process differently.
             self.__virtual.append(p_data)
 
+
     def __compute_best_partition_value(self):
         """Return the best partition value."""
-        if(self.size <= 0):
+        if(self.nb_constrained <= 0):
             raise ValueError()
-
-        # A new 'CompCounter' can only be created with a new point.
-        # Because a space part of a point have all his dimension defined.
-        # There is always at least one constrained data in a 'CompCounter'. 
-        assert self.nb_constrained >= 1
 
         if(self.__changed):
             nb_cut_left, nb_cut_right = 0, 0
@@ -460,21 +516,21 @@ class CompCounter(object):
     def __separate_data(self, nb_virtual_left, nb_virtual_right):
         assert len(self.__virtual) == nb_virtual_left + nb_virtual_right
 
+        self.__data_left = list()
+        self.__data_right = list()
+
         # Separate the constrained data.
-        for comp, freq, datas in self.__constrained:
+        for comp, unused, datas in self.__constrained:
             if(comp <= self.__cut_value):
                 # Add the data to the left part.
                 prev_size = len(self.__data_left)
                 self.__data_left.extend(datas)
-                assert len(self.__data_left) == prev_size + freq
+                assert len(self.__data_left) == prev_size + len(datas)
             else:
                 # Add the data to the right part.
                 prev_size = len(self.__data_right)
                 self.__data_right.extend(datas)
-                assert len(self.__data_right) == prev_size + freq
-
-            print("SET LF: ", self.__data_left)
-            print("SET RG: ", self.__data_right)
+                assert len(self.__data_right) == prev_size + len(datas)
 
         # Separate the virtual data.
         for i in range(len(self.__virtual)):
@@ -531,10 +587,14 @@ class CompCounter(object):
     # Debug methods
 
     def print_debug(self):
-        for i in range(len(self.__constrained)):
-            comp, freq, datas = self.__constrained[i]
-            print(i, ".", freq, "*", comp)
-            print(i, ".", "Data:", datas)
+        print("CompCounter")
+        print(" Dim   :", self.__dimension)
+        print(" All   :", self.__constrained)
+        print(" Virt  :", self.__virtual)
+        print(" Split :", self.best_bound_value)
+        print(" Ratio :", self.ratio_diff_between_side)
+        print(" Left  :", self.__data_left)
+        print(" Right :", self.__data_right)
 
 # ------------------------------------------------------------------------------------------------
 

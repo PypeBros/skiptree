@@ -222,9 +222,10 @@ class Val(object):
         return self.__val
 
 
-from equation import Component
-from equation import CompCounter
 from equation import Dimension
+from equation import Component
+from equation import SpacePart
+from equation import DataStore
 
 if __name__ == "__main__":
 
@@ -240,28 +241,35 @@ if __name__ == "__main__":
 
         print("Place to test little code.")
 
-        dim = Dimension("address")
+        #
+        #
 
-        compA = Component(dim, 0)
-        compB = Component(dim, 1)
-        compC = None
+        dimA = Dimension("dimA")
+        dimB = Dimension("dimB")
+        dimC = Dimension("dimC")
+        dimD = Dimension("dimD")
 
-        counter = CompCounter(dim)
-        counter.add(compA, "0")
-        counter.print_debug()
+        #
+        #
+
+        spA = SpacePart([Component(dimA, 0), Component(dimB, 0)])
+        spB = SpacePart([Component(dimA, 1), Component(dimB, 10)])
+        spC = SpacePart([Component(dimD, 2), Component(dimC, 1)])
+        spD = SpacePart([Component(dimB, 3)])
+
+        #
+        #
+        dataStore = DataStore()
+
+        dataStore.add(spA, "A")
+        dataStore.add(spB, "B")
+        dataStore.add(spC, "C")
+        dataStore.add(spD, "D")
+
+        dataStore.print_debug()
+        print(dataStore.get_partition_value())
+
 
         print("---- ---- ---- ---- ---- ---- ---- ----")
-
-        counter.add(compB, "1")
-        counter.add(compA, "9")
-        counter.print_debug()
-
-        print("---- ---- ---- ---- ---- ---- ---- ----")
-
-        x = counter.best_bound_value
-        print(x)
-
-        y = counter.ratio_diff_between_side
-        print(y)
 
 

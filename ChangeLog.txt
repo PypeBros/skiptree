@@ -1,9 +1,6 @@
 
-Fix the add in the DataStore.
-Fix the computing of the best partition value.
-
-Html: Ajout dans la recherche simple.
-Html: Ajout dans l'insertion de point.
-Html: Correction dans l'insertion de point.
-Html: Clarification sur la classification des cas.
+Fix creation of a SpacePart from a list.
+Fix the adding in the CompCounter.
+Add acces to the split data from the DataStore.
+Add some display function to the debug the Component, DataStore and CompCounter.
 
