@@ -292,6 +292,12 @@ class SpacePart(object):
         return previous
 
     #
+    # Overwritten
+
+    def __repr__(self):
+        return "SP"
+
+    #
     # Debug methods
 
     def print_debug(self):
@@ -324,11 +330,12 @@ class DataStore(object):
             if (space_part.get_component(dim) == None):
                 raise ValueError()
 
-        self.__data.append((space_part, data))
+        data_pair = (space_part, data)
+        self.__data.append((space_part, data_pair))
 
         # Add the data into the existing counters.
         for dim, valCounter in self.__data_by_dimension.items():
-            valCounter.add(space_part.get_component(dim), data)
+            valCounter.add(space_part.get_component(dim), data_pair)
 
         # Add new counters.
         for dim in dim_new:
@@ -376,8 +383,8 @@ class CompCounter(object):
         self.__dimension = dimension
 
         self.__nb_value = 0
-        self.__virtual = list()
-        self.__constrained = list()    # List of sub-lists. Sub-list is as followed "[value, frequency of that value, [data related]].
+        self.__virtual = list()         # [ (space_part, data)? ]
+        self.__constrained = list()     # [ [value, nb_before_value, [ (space_part, data)? ] ]? ]
 
         self.__changed = True
 
@@ -471,7 +478,7 @@ class CompCounter(object):
                         added = True
 
                     elif(p_comp == comp):
-                        datas.extend(p_data)
+                        datas.append(p_data)
                         self.__constrained[i] = [comp, left_sided + 1, datas]
                         added = True
 
@@ -523,29 +530,21 @@ class CompCounter(object):
         for comp, unused, datas in self.__constrained:
             if(comp <= self.__cut_value):
                 # Add the data to the left part.
-                prev_size = len(self.__data_left)
                 self.__data_left.extend(datas)
-                assert len(self.__data_left) == prev_size + len(datas)
             else:
                 # Add the data to the right part.
-                prev_size = len(self.__data_right)
                 self.__data_right.extend(datas)
-                assert len(self.__data_right) == prev_size + len(datas)
 
         # Separate the virtual data.
         for i in range(len(self.__virtual)):
             virtual = self.__virtual[i]
             if(i < nb_virtual_left):
                 #Add the data to left part.
-                prev_size = len(self.__data_left)
                 self.__data_left.append(virtual)
-                assert len(self.__data_left) == prev_size + 1
 
             elif (nb_virtual_left <= i):
                 #Add the data to right part.
-                prev_size = len(self.__data_right)
                 self.__data_right.append(virtual)
-                assert len(self.__data_right) == prev_size + 1
 
         assert self.size == len(self.__data_left) + len(self.__data_right)
 
@@ -590,11 +589,27 @@ class CompCounter(object):
         print("CompCounter")
         print(" Dim   :", self.__dimension)
         print(" All   :", self.__constrained)
-        print(" Virt  :", self.__virtual)
+        print(" Virt  :", self.__data_to_string(self.__virtual))
         print(" Split :", self.best_bound_value)
         print(" Ratio :", self.ratio_diff_between_side)
-        print(" Left  :", self.__data_left)
-        print(" Right :", self.__data_right)
+        print(" Left  :", self.__data_to_string(self.__data_left))
+        print(" Right :", self.__data_to_string(self.__data_right))
+
+
+    def __data_to_string(self, l_data):
+        string = "["
+        for i in range(len(l_data)):
+            if (i != 0):
+                string += ", "
+
+            dt = l_data[i]
+            if(len(l_data[i]) == 2):
+                unused, dt = l_data[i]
+            string += "'" + str(dt) + "'"
+
+        string += "]"
+
+        return string
 
 # ------------------------------------------------------------------------------------------------
 

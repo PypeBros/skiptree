@@ -1,6 +1,3 @@
 
-Fix creation of a SpacePart from a list.
-Fix the adding in the CompCounter.
-Add acces to the split data from the DataStore.
-Add some display function to the debug the Component, DataStore and CompCounter.
+Correct DataStore to store space part with the related data.
 

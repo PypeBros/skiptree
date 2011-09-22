@@ -252,10 +252,10 @@ if __name__ == "__main__":
         #
         #
 
-        spA = SpacePart([Component(dimA, 0), Component(dimB, 0)])
-        spB = SpacePart([Component(dimA, 1), Component(dimB, 10)])
-        spC = SpacePart([Component(dimD, 2), Component(dimC, 1)])
-        spD = SpacePart([Component(dimB, 3)])
+        spA = SpacePart([Component(dimA, 0), Component(dimC, 1)])
+        spB = SpacePart([Component(dimA, 1)])
+        spC = SpacePart([Component(dimC, 2)])
+        spD = SpacePart([Component(dimB, 2), Component(dimC, 3)])
 
         #
         #
