@@ -314,9 +314,14 @@ class SpacePart(object):
 
 class DataStore(object):
 
-    def __init__(self):
+    def __init__(self, l_data=None):
         self.__data = list()
         self.__data_by_dimension = dict()
+
+        if(l_data != None):
+            for i in range(len(l_data)):
+                space_part, data = l_data[i]
+                self.add(space_part, data)
 
     def add(self, space_part, data):
         """Add a data in the DataStore."""

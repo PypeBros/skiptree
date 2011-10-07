@@ -5,7 +5,7 @@ import queue
 import sys
 
 # ResumeNet imports
-from equation import InternalNode
+from equation import InternalNode, DataStore
 from messages import VisitorRoute, VisitorMessage, STJoinReply, STJoinRequest
 from messages import RouteByNameID, RouteDirect
 from messages import SNJoinRequest, SNJoinReply, SNLeaveReply
@@ -235,81 +235,105 @@ class ProcessorVisitor(VisitorMessage):
 
 class JoinProcessor(VisitorMessage):
 
-    #TODO: avoid a node to join itself.
-    #TODO: verify that the message is send by the correct contact.
     #TODO: add the Timeout management.
+    #TODO: avoid a node to join itself.
+
+    #TODO: verify that the message is send by the correct contact.
+    #TODO: add a transaction id in the messages used to join the network.
 
     def __init__(self, node):
         self.__local_node = node
-
-        self.__join_busy = False
-        self.__new_node_local = None
-
-        self.__last_join_action = None
         self.__reset_join_state()
 
     def __reset_join_state(self):
         """Reset the state of the JoinProcessor."""
-        self.__new_side_local = None
-        self.__new_value_local = None
         self.__join_busy = False
+
+        self.__new_local_cpe = None
+        self.__new_local_data = None
 
     #
     #
 
     def is_busy(self):
+        """Return the state of the JoinProcessor."""
         return self.__join_busy
 
     def set_busy(self, value):
+        """Set the state of the JoinProcessor."""
         self.__join_busy = value
 
     #
     #
 
+    def join_SkipTree(self):
+        """Join the SkipTree Network."""
+
+        #TODO: !!!
+        join_request = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
+
+        route_msg = RouteDirect(join_request, self.__local_node)
+        self.__local_node.route_internal(route_msg)
+
+
     def visit_STJoinRequest(self, message):
         print("visit_STJoinRequest")
 
         if(message.phase == STJoinRequest.STATE_ASK):
+            # A new node would like to join the network.
+
             if(self.is_busy()):
+                # The local node is already busy with another joining node.
                 #TODO: Send an error message.
                 pass
 
             else:
+                # Compute a proposition for the joining node and sent it.
                 self.set_busy(True)
 
-                partition_id = self.compute_partition_id(message)
-                cpe = self.compute_cpe(message)
+                join_partition_id = self.compute_partition_id(message)
+                join_cpe, join_data, self.__new_local_cpe, self.__new_local_data = self.compute_cpe_and_data(message)
 
-                #TODO: Add the data in the message.
-
-                # Send a reply to the joining node.
                 join_reply = STJoinReply(self.__local_node, STJoinReply.STATE_PROPOSE)
-                join_reply.partition_id = partition_id
-                join_reply.cpe = cpe
-                join_reply.data = None
+                join_reply.partition_id = join_partition_id
+                join_reply.cpe = join_cpe
+                join_reply.data = join_data
 
                 route_msg = RouteDirect(join_reply, message.joining_node)
                 self.__local_node.route_internal(route_msg)
 
         elif(message.phase == STJoinRequest.STATE_ACCEPT):
-            # Update the local node status :
-                # Remove the transfered point
-                # Add the new CPE split
+            # Update the local node data.
+            self.__local_node.cpe = self.__new_local_cpe
+            self.__local_node.data_store = DataStore(self.__new_local_data)
 
-            # Republish new status
-            pass
+            local_node_status = self.__local_node.status_updater
+            local_node_status.update_status_now()
+
+            self.set_busy(False)
+
+            join_reply = STJoinReply(self.__local_node, STJoinReply.STATE_CONFIRM)
+
+            route_msg = RouteDirect(join_reply, message.joining_node)
+            self.__local_node.route_internal(route_msg)
 
         else:
+            #TODO: Send an error message.
             pass
 
     def visit_STJoinReply(self, message):
         print("visit_STJoinReply")
 
         if(message.phase == STJoinReply.STATE_PROPOSE):
+            # Set data received from contact node.
             self.__local_node.partition_id = message.partition_id
             self.__local_node.cpe = message.cpe
 
-            #TODO: Join the SkipNet
+            # Join the SkipTree
+            payload_msg = SNJoinRequest(self.__local_node)
+
+            route_msg = RouteDirect(payload_msg, self.__local_node)
+            self.__local_node.route_internal(route_msg)
 
             # Send a reply to the contact node.
             payload_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ACCEPT)
@@ -321,6 +345,7 @@ class JoinProcessor(VisitorMessage):
             pass
 
         else:
+            #TODO: Send an error message.
             pass
 
     def compute_partition_id(self, message):
@@ -343,21 +368,37 @@ class JoinProcessor(VisitorMessage):
         return partition_id
 
 
-    def compute_cpe(self, message):
+    def compute_cpe_and_data(self, message):
         """Compute the CPE of the joining node."""
+        # Determine sides.
         new_side_join = Router.by_name_get_direction(self.__local_node.name_id, message.joining_node.name_id)
         new_side_local = Direction.get_opposite(new_side_join)
 
+        # Create the CPE.
         data_store = self.__local_node.data_store
-        [cut_dimension, cut_value] = data_store.get_partition_value()
+        [cut_dimension, cut_value, data_left, data_right] = data_store.get_partition_value()
 
-        new_node_join = InternalNode(new_side_join, cut_dimension, cut_value)
-        self.__new_node_local = InternalNode(new_side_local, cut_dimension, cut_value)
+        # Create the CPE for the joining node.
+        new_join_node = InternalNode(new_side_join, cut_dimension, cut_value)
+        new_join_cpe = copy.deepcopy(self.__local_node.cpe)
+        new_join_cpe.add_node(new_join_node)
 
-        cpe = copy.deepcopy(self.__local_node.cpe)
-        cpe.add_node(new_node_join)
+        # Create the CPE for the local node.
+        new_local_node = InternalNode(new_side_local, cut_dimension, cut_value)
+        new_local_cpe = copy.deepcopy(self.__local_node.cpe)
+        new_local_cpe.add_node(new_local_node)
 
-        return cpe
+        # Split the data.
+        if(new_side_join == Direction.LEFT):
+            new_join_value = data_left
+            new_local_value = data_right
+        else:
+            assert new_side_join == Direction.RIGHT
+            new_join_value = data_right
+            new_local_value = data_left
+
+        return new_join_cpe, new_join_value, new_local_cpe, new_local_value
+
 
     def visit_SNJoinRequest(self, message):
         if(message.state == SNJoinRequest.SEED):

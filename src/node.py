@@ -99,9 +99,9 @@ class Node(object):
         self.__neighbourhood = Neighbourhood(self)  #Neighbours
 
         # Launch the heart beats. 
-        th = NodeHeartBeat(self)
-        th.daemon = True
-        #th.start()
+        self.__status_up = NodeStatusPublisher(self)    #Status updater
+        self.__status_up.daemon = True
+        self.__status_up.start()
 
     #
     # Properties
@@ -149,6 +149,11 @@ class Node(object):
         """Return the DataStore of the Node."""
         return self.__data_store
 
+    @data_store.setter
+    def data_store(self, value):
+        """Set the DataStore of the Node."""
+        self.__data_store = value
+
     @property
     def net_info(self):
         """Return the network information of the Node."""
@@ -156,13 +161,18 @@ class Node(object):
 
     @property
     def sender(self):
-        """Return the object used to __send messages."""
+        """Return the object used to send messages."""
         return self.__send
 
     @property
     def neighbourhood(self):
         """Return the neighbourhood of the Node."""
         return self.__neighbourhood
+
+    @property
+    def status_updater(self):
+        """Return the status updater of the Node."""
+        return self.__status_up
 
     #
     #
@@ -262,32 +272,51 @@ class Node(object):
         state['_Node__dispatcher'] = None
         state['_Node__send'] = None
         state['_Node__neighbourhood'] = None
+        state['_Node__th'] = None
 
         return state
 
 
-class NodeHeartBeat(threading.Thread):
-    """Send node's heartBeat."""
+class NodeStatusPublisher(threading.Thread):
+    """Regularly publish the status of a node."""
 
-    # Time between each heart beat.
+    # Time between each heart beat (in seconds).
     DEFAULT_TIME_BTW_BEAT = 10 * 60
 
     def __init__(self, local_node, heartbeat_delay=DEFAULT_TIME_BTW_BEAT):
         threading.Thread.__init__(self)
         self.__local_node = local_node
         self.__heartbeat_delay = heartbeat_delay
+        self.__last_action = time.time() - (2 * self.__heartbeat_delay)
 
     def run(self):
         while True:
-            neighbourhood = self.__local_node.neighbourhood
-            nb_ring_level = neighbourhood.get_nb_ring()
+            time_next_action = self.__last_action + self.__heartbeat_delay
+            time_current = time.time()
+            if (time_next_action <= time_current):
+                # The time to wait has expired.
+                self.__update_status()
+                time.sleep(self.__heartbeat_delay)
+            else:
+                # The time to wait hasn't expired.
+                assert (time_next_action > time_current)
+                assert (time_next_action - time_current) > 0
+                assert (time_next_action - time_current) < self.__heartbeat_delay
+                time.sleep(time_next_action - time_current)
 
-            for ring_level in range(nb_ring_level):
-                # Say that the node is still in life.
-                ring = neighbourhood.get_ring(ring_level)
-                NeighbourhoodNet.ping_ring(self.__local_node, ring, ring_level)
 
-            NeighbourhoodNet.fix_from_level(self.__local_node, 0)
+    def update_status_now(self):
+        """Warm neighbours for a new local status."""
+        self.__update_status()
 
-            time.sleep(self.__heartbeat_delay)
+    def __update_status(self):
+        """Ping current neighbours and repair locals rings."""
+        neighbourhood = self.__local_node.neighbourhood
+        nb_ring_level = neighbourhood.get_nb_ring()
 
+        for ring_level in range(nb_ring_level):
+            # Say that the node is still in life.
+            ring = neighbourhood.get_ring(ring_level)
+            NeighbourhoodNet.ping_ring(self.__local_node, ring, ring_level)
+
+        NeighbourhoodNet.fix_from_level(self.__local_node, 0)

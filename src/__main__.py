@@ -200,26 +200,38 @@ def main():
         LOGGER.log(logging.WARNING, "There is an error in the main thread: " + str(sys.exc_info()[0]))
 
 
-class Contain(object):
 
-    def __init__(self):
-        self.__list = list()
+class ThreadTest(threading.Thread):
 
-    def add(self, elem):
-        self.__list.append(elem)
+    DEFAULT_TIME_BTW_BEAT = 5
 
-    @property
-    def values(self):
-        return self.__list
+    def __init__(self, heartbeat_delay=DEFAULT_TIME_BTW_BEAT):
+        threading.Thread.__init__(self)
+        self.__heartbeat_delay = heartbeat_delay
+        self.__last_action = None
 
-class Val(object):
+    def run(self):
+        self.__do_something()
+        while True:
+            time_next_action = self.__last_action + self.__heartbeat_delay
+            time_current = time.time()
+            if (time_next_action <= time_current):
+                # The time to wait has expired.
+                self.__do_something()
+                time.sleep(self.__heartbeat_delay)
+            else:
+                # The time to wait hasn't expired.
+                assert (time_next_action > time_current)
+                assert (time_next_action - time_current) > 0
+                assert (time_next_action - time_current) < self.__heartbeat_delay
+                time.sleep(time_next_action - time_current)
 
-    def __init__(self, val):
-        self.__val = val
+    def go(self):
+        self.__do_something()
 
-    @property
-    def val(self):
-        return self.__val
+    def __do_something(self):
+        self.__last_action = time.time()
+        print("Hello world  !")
 
 
 from equation import Dimension
@@ -237,9 +249,13 @@ if __name__ == "__main__":
             print("*NFO : python3 __main__.py <IP_ADDRESS> <PORT_NUMBER> <NAME_ID> <NUMERIC_ID>")
         else:
             main()
+
     else:
 
         print("Place to test little code.")
+
+        th = ThreadTest()
+        th.start()
 
         #
         #
@@ -271,5 +287,16 @@ if __name__ == "__main__":
 
 
         print("---- ---- ---- ---- ---- ---- ---- ----")
+
+        while True:
+            try:
+                print("\r\nDo you want to display an extra message ?")
+                choice = int(input())
+                if(choice == 1):
+                    th.go()
+                else:
+                    pass
+            except ValueError:
+                print("\r\n")
 
 

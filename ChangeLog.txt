@@ -1,3 +1,5 @@
 
-Correct DataStore to store space part with the related data.
+Correct the Join transaction.
+Correct the heartbeat class of the Node.
+Add an initialization method to DataStore.
 
