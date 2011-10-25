@@ -1,5 +1,4 @@
 
-Correct the Join transaction.
-Correct the heartbeat class of the Node.
-Add an initialization method to DataStore.
+Correct the Join processing.
+Add an Identity message.
 

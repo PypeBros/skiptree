@@ -7,7 +7,11 @@ import threading
 # ResumeNet imports
 from equation import CPE
 from equation import DataStore
-from messages import RouteDirect, SNJoinRequest, SNLeaveRequest, NeighbourhoodNet, STJoinRequest
+
+from messages import RouteDirect, RouteByNameID, NeighbourhoodNet
+from messages import SNJoinRequest, SNLeaveRequest
+from messages import IdentityRequest
+
 from nodeid import NumericID, PartitionID
 from network import OutRequestManager
 from neighbourhood import Neighbourhood
@@ -101,7 +105,7 @@ class Node(object):
         # Launch the heart beats. 
         self.__status_up = NodeStatusPublisher(self)    #Status updater
         self.__status_up.daemon = True
-        self.__status_up.start()
+        #self.__status_up.start()
 
     #
     # Properties
@@ -195,8 +199,9 @@ class Node(object):
         contact_node = Node(None, fake_numeric_id, boot_net_info)
 
         ## Join the SkipTree
-        payload_msg = STJoinRequest(self)
-        route_msg = RouteDirect(payload_msg, contact_node)
+        #TODO: Use the multiple encapsulation.
+        find_neighbour = IdentityRequest(self)
+        route_msg = RouteByNameID(find_neighbour, self.name_id)
         self.route_internal(route_msg)
 
     def leave(self):
@@ -272,7 +277,7 @@ class Node(object):
         state['_Node__dispatcher'] = None
         state['_Node__send'] = None
         state['_Node__neighbourhood'] = None
-        state['_Node__th'] = None
+        state['_Node__status_up'] = None
 
         return state
 

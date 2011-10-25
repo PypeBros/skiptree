@@ -72,6 +72,7 @@ class ThreadTalker(threading.Thread):
         self.__menu = list()
         self.__menu.append(("Display local node information.", self.__display))
         self.__menu.append(("Send a join message.", self.__send_join))
+        self.__menu.append(("Send a join message, SkipTree.", self.__send_join2))
         self.__menu.append(("Send a leave message.", self.__send_leave))
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
 
@@ -113,7 +114,7 @@ class ThreadTalker(threading.Thread):
         print(self.__local_node.cpe.__repr__())
 
     def __send_join(self):
-        print("Action - Send a join message")
+        print("Action - Send a join message - SkipNet")
 
         # Get the bootstrap contact
         print("Enter the bootstrap contact information")
@@ -122,6 +123,17 @@ class ThreadTalker(threading.Thread):
         boot_net_info = NetNodeInfo(("127.0.0.1", port))
 
         self.__local_node.join(boot_net_info)
+
+    def __send_join2(self):
+        print("Action - Send a join message - SkipTree")
+
+        # Get the bootstrap contact
+        print("Enter the bootstrap contact information")
+        print("Port (2000):")
+        port = int(input())
+        boot_net_info = NetNodeInfo(("127.0.0.1", port))
+
+        self.__local_node.join2(boot_net_info)
 
 
     def __send_leave(self):
@@ -241,7 +253,7 @@ from equation import DataStore
 
 if __name__ == "__main__":
 
-    execute_main = False
+    execute_main = True
 
     if(execute_main):
         if (len(sys.argv) != 5):

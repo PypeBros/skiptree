@@ -26,8 +26,6 @@ LOGGER.addHandler(LOG_HANDLER)
 
 # ------------------------------------------------------------------------------------------------
 
-#TODO: Add a comment next to each data member.
-
 """
 Note that the routing algorithm don't reside in message code. Indeed, we only want message to be 
 deliver. That's why routing decision should be done by "local node". A node is the only one that 
@@ -85,7 +83,13 @@ class VisitorMessage(object):
         pass
 
     def visit_STJoinRequest(self, message):
-        raise NotImplementedError()
+        pass
+
+    def visit_STJoinReply(self, message):
+        pass
+
+    def visit_STJoinError(self, message):
+        pass
 
 
 # ------------------------------------------------------------------------------------------------
@@ -232,7 +236,7 @@ class RouteByPayload(RouteMessage):
 
 class RouteByCPE(RouteMessage):
 
-    #TODO: The RouteByCPE SpacePart should be a copy of the one from PayLoad.
+    #TODO: The RouteByCPE SpacePart MUST be a copy of the one from PayLoad.
 
     def __init__(self, payload):
         RouteMessage.__init__(self, payload)
@@ -577,6 +581,76 @@ class STJoinReply(CtrlMessage):
 
     def accept(self, visitor):
         visitor.visit_STJoinRequest(self)
+
+
+def STJoinError(CtrlMessage):
+
+    def __init__(self, message=None):
+        CtrlMessage.__init__(self)
+
+        self.__reason = None
+        self.__original_msg = message
+
+    #
+    # Properties
+
+    @property
+    def original_message(self):
+        """Return the message that lead to the error."""
+        return self.__original_msg
+
+    @original_message.setter
+    def original_message(self, value):
+        """Set the message that lead to the error."""
+        self.__original_msg = value
+
+    @property
+    def reason(self):
+        """Return the reason of the error."""
+        return self.__reason
+
+    @reason.setter
+    def reason(self, value):
+        """Set the reason of the error."""
+        self.__reason = value
+
+# ------------------------------------------------------------------------------------------------
+
+class IdentityRequest(AppMessage):
+
+    def __init__(self, questioner_node):
+        AppMessage.__init__(self)
+        self.__questioner_node = questioner_node
+        self.__looked_name = questioner_node.name_id
+
+    @property
+    def contact_node(self):
+        return self.__questioner_node
+
+    def accept(self, visitor):
+        visitor.visit_IdentityRequest(self)
+
+
+class IdentityReply(CtrlMessage):
+
+    def __init__(self, neighbour_node):
+        AppMessage.__init__(self)
+        self.__neighbour_node = neighbour_node
+
+    @property
+    def neighbour(self):
+        return self.__neighbour_node
+
+    def accept(self, visitor):
+        visitor.visit_IdentityReply(self)
+
+class EncapsulatedMessage(AppMessage):
+
+    def __init__(self):
+        AppMessage.__init__(self)
+
+        self.__condition = None
+        self.__encapsulated_message = None
 
 # ------------------------------------------------------------------------------------------------
 
