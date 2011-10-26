@@ -2,16 +2,16 @@
 EN COURS
 --------
 	Implémentation d'un contexte d'insertion de noeud (L'arrivée de noeud comprend plusieurs échanges).
-	Implémentation de l'insertion d'un point.
+	Implémentation du routing d'une requête simple et par intervalle.	
 
 
 À FAIRE
 --------
-	Vérifier l'insertion de point.
-	Vérifier le routing d'une requête simple.
-	Vérifier le routing d'une requête par intervalle.
-
+	Implémenter l'insertion de point.
+	
+	Implémenter la construction des requêtes.
 	Implémenter les réponses aux requêtes.
 	Implémenter la reconstruction des réponses.
+	
 	Implémentation du composant de boostrap.
 	Implémentation du load balancing.
