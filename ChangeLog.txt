@@ -1,4 +1,3 @@
 
-Correct the Join processing.
-Add an Identity message.
-
+Add the encpasulation of message.
+Move the processing of the Identity messages.

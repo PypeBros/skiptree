@@ -50,8 +50,7 @@ class MessageDispatcher(VisitorRoute):
 
     def dispatch(self):
         """Dispatch the messages through components."""
-        #TODO: Change exception management, local_node comparison 
-        #TODO: Multiple encapsulation of message. 
+        #TODO: Change exception management, local_node comparison  
         while True:
             message = self.__queue.get()
             try:
@@ -200,7 +199,13 @@ class ProcessorVisitor(VisitorMessage):
         message.process(self.__local_node)
 
     #
-    # Dispatching for the Join messages.
+    # Dispatching for the "Join" messages.
+
+    def visit_SNJoinRequest(self, message):
+        self.__join_processor.visit_SNJoinRequest(message)
+
+    def visit_SNJoinReply(self, message):
+        self.__join_processor.visit_SNJoinReply(message)
 
     def visit_STJoinRequest(self, message):
         self.__join_processor.visit_STJoinRequest(message)
@@ -211,20 +216,8 @@ class ProcessorVisitor(VisitorMessage):
     def visit_STJoinError(self, message):
         self.__join_processor.visit_STJoinError(message)
 
-    def visit_SNJoinRequest(self, message):
-        self.__join_processor.visit_SNJoinRequest(message)
-
-    def visit_SNJoinReply(self, message):
-        self.__join_processor.visit_SNJoinReply(message)
-
-    def visit_IdentityRequest(self, message):
-        self.__join_processor.visit_IdentityRequest(message)
-
-    def visit_IdentityReply(self, message):
-        self.__join_processor.visit_IdentityReply(message)
-
     #
-    # Dispatching for the Leave messages.
+    # Dispatching for the "Leave" messages.
 
     def visit_SNLeaveRequest(self, message):
         LOGGER.log(logging.DEBUG, "[DGB] SNLeaveRequest - Process")
@@ -251,6 +244,26 @@ class ProcessorVisitor(VisitorMessage):
         # Add the new neighbour.
         self.__local_node.neighbourhood.add_neighbour(message.ring_level, message.src_node)
 
+    #
+    # Dispatching "Application" messages.
+
+    def visit_IdentityRequest(self, message):
+        find_neighbour = IdentityReply(self.__local_node)
+        route_msg = RouteDirect(find_neighbour, message.contact_node)
+        self.__local_node.route_internal(route_msg)
+
+    def visit_IdentityReply(self, message):
+        contact_node = message.neighbour
+
+        #TODO: !!!
+        if(False and contact_node != None and contact_node != self.__local_node):
+            join_request = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
+            route_msg = RouteDirect(join_request, contact_node)
+            self.__local_node.route_internal(route_msg)
+
+
+    def visit_EncapsulatedMessage(self, message):
+        self.__local_node.route_internal(message.encapsulated_message)
 
 
 class JoinProcessor(VisitorMessage):
@@ -469,19 +482,4 @@ class JoinProcessor(VisitorMessage):
         LOGGER.log(logging.DEBUG, "[DBG] SNJoinReply - Process")
         NeighbourhoodNet.repair_level(self.__local_node, self.__local_node.neighbourhood, 0, message.neightbours)
 
-
-    def visit_IdentityRequest(self, message):
-        LOGGER.log(logging.DEBUG, "[DBG] IdentityRequest - Process")
-        find_neighbour = IdentityReply(self.__local_node)
-        route_msg = RouteDirect(find_neighbour, message.contact_node)
-        self.__local_node.route_internal(route_msg)
-
-    def visit_IdentityReply(self, message):
-        LOGGER.log(logging.DEBUG, "[DBG] IdentityReply - Process")
-        contact_node = message.neighbour
-        print("Name of the closest neighbour : ", contact_node.name_id)
-        if(False and contact_node != None and contact_node != self.__local_node):
-            join_request = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
-            route_msg = RouteDirect(join_request, contact_node)
-            self.__local_node.route_internal(route_msg)
 

@@ -6,7 +6,10 @@ import threading
 
 # ResumeNet imports
 from localevent import MessageDispatcher
-from messages import SNPingRequest, RouteByNumericID
+
+from messages import RouteDirect, RouteByNumericID
+from messages import SNPingRequest
+
 from network import InRequestManager
 from node import NetNodeInfo, Node
 from nodeid import NumericID, NameID
@@ -71,8 +74,8 @@ class ThreadTalker(threading.Thread):
 
         self.__menu = list()
         self.__menu.append(("Display local node information.", self.__display))
-        self.__menu.append(("Send a join message.", self.__send_join))
-        self.__menu.append(("Send a join message, SkipTree.", self.__send_join2))
+        self.__menu.append(("Send a join message, SkipNet.", self.__send_join_skipnet))
+        self.__menu.append(("Send a join message, SkipTree.", self.__send_join_skiptree))
         self.__menu.append(("Send a leave message.", self.__send_leave))
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
 
@@ -113,7 +116,7 @@ class ThreadTalker(threading.Thread):
         print("Action - Display the local node CPE")
         print(self.__local_node.cpe.__repr__())
 
-    def __send_join(self):
+    def __send_join_skipnet(self):
         print("Action - Send a join message - SkipNet")
 
         # Get the bootstrap contact
@@ -124,7 +127,7 @@ class ThreadTalker(threading.Thread):
 
         self.__local_node.join(boot_net_info)
 
-    def __send_join2(self):
+    def __send_join_skiptree(self):
         print("Action - Send a join message - SkipTree")
 
         # Get the bootstrap contact
@@ -134,7 +137,6 @@ class ThreadTalker(threading.Thread):
         boot_net_info = NetNodeInfo(("127.0.0.1", port))
 
         self.__local_node.join2(boot_net_info)
-
 
     def __send_leave(self):
         print("Action - Send a leave message")

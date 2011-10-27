@@ -10,7 +10,7 @@ from equation import DataStore
 
 from messages import RouteDirect, RouteByNameID, NeighbourhoodNet
 from messages import SNJoinRequest, SNLeaveRequest
-from messages import IdentityRequest
+from messages import EncapsulatedMessage
 
 from nodeid import NumericID, PartitionID
 from network import OutRequestManager
@@ -183,9 +183,8 @@ class Node(object):
 
     def join(self, boot_net_info):
         """Join the overlay."""
-        #TODO: Improve the node creation
-        fake_numeric_id = NumericID()
-        contact_node = Node(None, fake_numeric_id, boot_net_info)
+        # Only the boot_net_info is used.
+        contact_node = Node(None, NumericID(), boot_net_info)
 
         # Join SkipNet
         payload_msg = SNJoinRequest(self)
@@ -193,19 +192,23 @@ class Node(object):
         self.route_internal(route_msg)
 
     def join2(self, boot_net_info):
-        """Join the overlay."""
-        #TODO: Improve the node creation
-        fake_numeric_id = NumericID()
-        contact_node = Node(None, fake_numeric_id, boot_net_info)
+        """Start joining the SkipTree overlay."""
+        # Only the boot_net_info is used.
+        contact_node = Node(None, NumericID(), boot_net_info)
 
-        ## Join the SkipTree
-        #TODO: Use the multiple encapsulation.
-        find_neighbour = IdentityRequest(self)
-        route_msg = RouteByNameID(find_neighbour, self.name_id)
+        # To join the SkipTree, the node must first join the SkipNet overlay. 
+        payload_1 = SNJoinRequest(self)
+        route_int = RouteByNameID(payload_1, self.name_id)
+
+        # An encapsulation message is needed because the current don't have any links with node.
+        payload_final = EncapsulatedMessage(route_int)
+        route_msg = RouteDirect(payload_final, contact_node)
         self.route_internal(route_msg)
 
     def leave(self):
-        """Leave the overlay."""
+        """Start leaving the SkipTree overlay."""
+        #TODO: move the SkipTree data to the remaining node.        
+
         # Send a disconnection message to all SkiptNet neighbours.        
         neighbours = self.__neighbourhood.get_all_unique_neighbours()
         for neighbour in neighbours:

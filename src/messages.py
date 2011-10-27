@@ -82,6 +82,7 @@ class VisitorMessage(object):
     def visit_SNPingRequest(self, message):
         pass
 
+
     def visit_STJoinRequest(self, message):
         pass
 
@@ -89,6 +90,16 @@ class VisitorMessage(object):
         pass
 
     def visit_STJoinError(self, message):
+        pass
+
+
+    def visit_IdentityRequest(self, message):
+        pass
+
+    def visit_IdentityReply(self, message):
+        pass
+
+    def visit_EncapsulatedMessage(self, message):
         pass
 
 
@@ -617,6 +628,7 @@ def STJoinError(CtrlMessage):
 # ------------------------------------------------------------------------------------------------
 
 class IdentityRequest(AppMessage):
+    """This class represents an Identity request."""
 
     def __init__(self, questioner_node):
         AppMessage.__init__(self)
@@ -631,7 +643,8 @@ class IdentityRequest(AppMessage):
         visitor.visit_IdentityRequest(self)
 
 
-class IdentityReply(CtrlMessage):
+class IdentityReply(AppMessage):
+    """This class represents an Identity answer."""
 
     def __init__(self, neighbour_node):
         AppMessage.__init__(self)
@@ -644,13 +657,26 @@ class IdentityReply(CtrlMessage):
     def accept(self, visitor):
         visitor.visit_IdentityReply(self)
 
-class EncapsulatedMessage(AppMessage):
 
-    def __init__(self):
+class EncapsulatedMessage(AppMessage):
+    """This class encapsulates a message that should be routed in a different way. 
+    
+    When this message arrives at a destination node, the encapsulated message should be extracted 
+    and routed by the destination node with the appropriate routing method.
+    """
+
+    def __init__(self, payload):
         AppMessage.__init__(self)
 
-        self.__condition = None
-        self.__encapsulated_message = None
+        self.__encapsulated_message = payload
+
+    @property
+    def encapsulated_message(self):
+        """Return the message encapsulated."""
+        return self.__encapsulated_message
+
+    def accept(self, visitor):
+        visitor.visit_EncapsulatedMessage(self)
 
 # ------------------------------------------------------------------------------------------------
 
