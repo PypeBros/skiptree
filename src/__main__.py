@@ -74,6 +74,7 @@ class ThreadTalker(threading.Thread):
 
         self.__menu = list()
         self.__menu.append(("Display local node information.", self.__display))
+        self.__menu.append(("Add data to the local node", self.__add_data))
         self.__menu.append(("Send a join message (SkipTree).", self.__send_join_skiptree))
         self.__menu.append(("Send a leave message.", self.__send_leave))
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
@@ -114,6 +115,14 @@ class ThreadTalker(threading.Thread):
     def __display_node_cpe(self):
         print("Action - Display the local node CPE")
         print(self.__local_node.cpe.__repr__())
+
+    def __add_data(self):
+        #TODO: !!!
+        # Create a dimension.
+        # Create a component.
+        # Create a Space_Part
+        # self.__local_node.data_store.add()
+        pass
 
     def __send_join_skiptree(self):
         print("Action - Send a join message - SkipTree")

@@ -4,6 +4,7 @@ import logging
 
 # ResumeNet imports
 from util import Direction
+
 from equation import Component
 from equation import CPEMissingDimension
 from equation import Range
@@ -14,7 +15,7 @@ from equation import Range
 LOG_HANDLER = logging.StreamHandler()
 LOG_HANDLER.setLevel(logging.DEBUG)
 
-LOGGER = logging.getLogger("queries")
+LOGGER = logging.getLogger("routing")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
@@ -37,15 +38,20 @@ class RouterReflect(object):
 
             dim_unknown = dim_cpe.difference(dim_msg)
             for dim in dim_unknown:
-                # Create virtual dimension.
+                # Create virtual dimension.                            
                 (m_min, m_max) = local_node.cpe.get_range(dim)
-                assert (m_min != None or m_max != None), "Bounds can't be both undefined."
 
-                virt_val = m_min
+                # The value for a virtual value could be taken from the CPE.
+                # CPE is created when a split is made, if a split is made there is a least one finite value                
+                assert (m_min != None or m_max != None), "Bounds in an internal node can't be both undefined."
+                virt_val = None
                 if(m_min == None):
-                    # The minimum bound isn't usable.
-                    virt_val = m_max
-                comp = Component(dim, virt_val, True)
+                    virt_val = (m_max, m_max, True, True)
+                else:
+                    virt_val = (m_min, m_min, True, True)
+
+                new_comp = Component(dim, virt_val, True)
+                message.space_part.set_component(new_comp)
 
             return self.__by_cpe_get_next_hop_default(local_node, message)
 
@@ -60,25 +66,28 @@ class RouterReflect(object):
         left, here, right = local_node.cpe.which_side_space(message.space_part)
         if(here):
             # The message is intended to the local node.
-            return ((local_node, message))
+            return [(local_node, message)]
         else:
             last_pid_checked = None
             neigbourhood = local_node.neighbourhood
 
             directions = (Direction.LEFT, Direction.RIGHT)
             for direction in directions:
-                # Loop by the neighbourhood by the farthest node.
+                # Loop the neighbourhood by the farthest node.
                 for height in range(neigbourhood.get_nb_ring() - 1, -1, -1):
                     neighbour = neigbourhood.get_neighbour(direction, height)
                     neighbour_pid = neighbour.partition_id
 
                     if(RouterReflect.__check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node.partition_id)):
+                        # Now, we are sure that the neighbour_pid is really smaller (higher) 
+                        # than the local node one when the direction is set to LEFT (RIGHT).
+                        # So, RIGHT is RIGHT and LEFT is LEFT.
                         last_pid_checked = neighbour_pid
 
                         left, here, right = neighbour.cpe.which_side_space(message.space_part)
                         if(here or RouterReflect.__is_last(direction, left, right)):
                             # The destination node have been found.
-                            return ((neighbour, message))
+                            return [(neighbour, message)]
 
     #
     # Route by CPE (for Simple and Range queries)
@@ -100,14 +109,14 @@ class RouterReflect(object):
             all_intended = list()
             left, here, right = local_node.cpe.which_side_space(message.space_part)
 
-            if here:
+            if (here):
                 if(RouterReflect.__is_pid_in_range(local_node.partition_id, message.limit)):
-                    #TODO: don't forget to avoid the loop !!!
+                    #TODO: put the message in the dispatcher and not in the node list
                     all_intended.append((local_node, message))
 
-            if left:
+            if (left):
                 directions.append(Direction.LEFT)
-            if right:
+            if (right):
                 directions.append(Direction.RIGHT)
 
             last_pid_checked = None
@@ -124,10 +133,7 @@ class RouterReflect(object):
                         last_pid_checked = neighbour_pid
 
                         if(RouterReflect.__is_pid_in_range(local_node.partition_id, message.limit)):
-                            try:
-                                left, here, right = neighbour.cpe.which_side_space(message.space_part)
-                            except CPEMissingDimension:
-                                assert False, "This should never happen !"
+                            left, here, right = neighbour.cpe.which_side_space(message.space_part)
 
                             if(direction == Direction.LEFT):
                                 if(here or left):
@@ -137,7 +143,6 @@ class RouterReflect(object):
 
                                 if(not right):
                                     # Stop looping because there is no more node "in charge" the requested the region.
-                                    # This code block, the break isn't mandatory.
                                     break
 
                             else:
@@ -150,11 +155,10 @@ class RouterReflect(object):
 
                                 if(not left):
                                     # Stop looping because there is no more node "in charge" the requested the region.
-                                    # This code block, the break isn't mandatory.
                                     break
 
         except CPEMissingDimension:
-            assert False, "This should never happen !"
+            assert False, "Because unknown dimension have been added, this should never happen !"
 
         return all_intended
 
@@ -178,15 +182,15 @@ class RouterReflect(object):
         if(last_pid_checked != None):
             # The last_pid_checked is defined.
             # The strongest constrain is to check the position in comparison of latest checked node.
-            return RouterReflect.__check_pid(last_pid_checked, neighbour_pid, direction)
+            return RouterReflect.__check_pid(direction, last_pid_checked, neighbour_pid)
         else:
             # The last_pid_checked isn't defined.
             # The strongest constrain is to check the position in comparison of local node pid.
-            return RouterReflect.__check_pid(neighbour_pid, local_node_pid, direction)
+            return RouterReflect.__check_pid(direction, neighbour_pid, local_node_pid)
 
     @staticmethod
-    def __check_pid(pidA, pidB, direction):
-        """Indicates if the 'pidB' appears after 'pidA' according to the direction."""
+    def __check_pid(direction, pidA, pidB):
+        """Indicates if the 'pidB' appears farther than 'pidA' according to the direction."""
         if(direction == Direction.LEFT):
             return pidA < pidB
         else:

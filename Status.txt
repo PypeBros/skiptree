@@ -1,14 +1,11 @@
 
 EN COURS
---------
-	Implémentation d'un contexte d'insertion de noeud (L'arrivée de noeud comprend plusieurs échanges).
-	Implémentation du routing d'une requête simple et par intervalle.	
-
+--------	
+	Implémenter l'insertion de points.
 
 À FAIRE
 --------
-	Implémenter l'insertion de point.
-	
+
 	Implémenter la construction des requêtes.
 	Implémenter les réponses aux requêtes.
 	Implémenter la reconstruction des réponses.

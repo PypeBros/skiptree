@@ -6,6 +6,7 @@ Messages are used to carry information. That information come
 
 # System imports
 import logging
+import copy
 
 # ResumeNet imports
 from equation import Range
@@ -250,12 +251,10 @@ class RouteByPayload(RouteMessage):
 
 class RouteByCPE(RouteMessage):
 
-    #TODO: The RouteByCPE SpacePart MUST be a copy of the one from PayLoad.
-
-    def __init__(self, payload):
+    def __init__(self, payload, space_part):
         RouteMessage.__init__(self, payload)
 
-        self.__space_part = SpacePart()
+        self.__space_part = copy.deepcopy(space_part)
         self.__limit = Range(None, None, False, False)
 
     @property

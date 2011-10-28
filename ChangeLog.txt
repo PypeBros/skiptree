@@ -1,4 +1,2 @@
 
-Add a prefix function in the node id.
-Add reason to JoinError messages.
-Correct the SkiptTree join to respect the locality.
+Verify the code of the CPE routing functions.

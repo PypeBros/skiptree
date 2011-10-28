@@ -112,6 +112,8 @@ class Router(object):
         """Return the next network interface to witch send a message in a direct routing."""
         return [(message.destination, message)]
 
+    #
+    #
 
     def route_by_numeric(self, message):
         """Return the next network interface to witch send a message in a numeric routing."""
@@ -147,6 +149,8 @@ class Router(object):
 
         return local_node.neighbourhood.get_neighbour(Direction.RIGHT, message.ring_level)
 
+    #
+    #
 
     def route_by_name(self, message):
         """Return the list of pair (next network interface, message) to witch send the message in a routing by name."""
@@ -183,7 +187,6 @@ class Router(object):
             return Direction.RIGHT
         else:
             return Direction.LEFT
-
 
 # ------------------------------------------------------------------------------------------------
 
