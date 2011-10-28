@@ -10,8 +10,8 @@ from equation import InternalNode, DataStore
 from messages import VisitorRoute, VisitorMessage
 from messages import RouteByNameID, RouteDirect
 from messages import SNJoinRequest, SNJoinReply, SNLeaveReply
-from messages import STJoinReply, STJoinRequest, STJoinError
-from messages import IdentityRequest, IdentityReply
+from messages import STJoinReply, STJoinRequest, STJoinError, JoinException
+from messages import IdentityReply
 from messages import NeighbourhoodNet
 
 from nodeid import NodeID, PartitionID
@@ -29,7 +29,7 @@ LOGGER.addHandler(LOG_HANDLER)
 
 # ------------------------------------------------------------------------------------------------
 
-class MessageDispatcher(VisitorRoute):
+class MessageDispatcher(object):
     """Dispatch messages through components of the application."""
 
     PRIO_MAX, PRIO_DEFAULT, PRIO_MIN = range(0, 30000, 10000)
@@ -95,6 +95,9 @@ class RouterVisitor(VisitorRoute):
 
     def visit_RouteByPayload(self, message):
         return message.route(self.__local_node)
+
+    def visit_RouteByCPE(self, message):
+        raise NotImplementedError
 
 
 class Router(object):
@@ -253,22 +256,13 @@ class ProcessorVisitor(VisitorMessage):
         self.__local_node.route_internal(route_msg)
 
     def visit_IdentityReply(self, message):
-        contact_node = message.neighbour
-
-        #TODO: !!!
-        if(False and contact_node != None and contact_node != self.__local_node):
-            join_request = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
-            route_msg = RouteDirect(join_request, contact_node)
-            self.__local_node.route_internal(route_msg)
-
+        pass
 
     def visit_EncapsulatedMessage(self, message):
         self.__local_node.route_internal(message.encapsulated_message)
 
 
 class JoinProcessor(VisitorMessage):
-
-    #TODO: add a Timeout management.
 
     def __init__(self, node):
         self.__local_node = node
@@ -304,7 +298,7 @@ class JoinProcessor(VisitorMessage):
 
             if(self.is_busy()):
                 # The local node is already busy with another joining node.
-                join_error = STJoinError(message)
+                join_error = STJoinError(message, "Contacted node already busy with a join activity")
 
                 route_msg = RouteDirect(join_error, message.joining_node)
                 self.__local_node.route_internal(route_msg)
@@ -340,7 +334,7 @@ class JoinProcessor(VisitorMessage):
             self.__local_node.route_internal(route_msg)
 
         else:
-            join_error = STJoinError(message)
+            join_error = STJoinError(message, "Unrecognized join request.")
 
             route_msg = RouteDirect(join_error, message.joining_node)
             self.__local_node.route_internal(route_msg)
@@ -353,7 +347,7 @@ class JoinProcessor(VisitorMessage):
 
             if(self.is_busy()):
                 # The local node is already busy with another joining node.
-                join_error = STJoinError(message)
+                join_error = STJoinError(message, "Contacted node already busy with a join activity")
 
                 route_msg = RouteDirect(join_error, message.joining_node)
                 self.__local_node.route_internal(route_msg)
@@ -365,12 +359,6 @@ class JoinProcessor(VisitorMessage):
                 self.__local_node.partition_id = message.partition_id
                 self.__local_node.cpe = message.cpe
 
-                # Join the SkipNet and the SkipTree
-                #TODO: verify
-                payload_msg = SNJoinRequest(self.__local_node)
-                route_msg = RouteDirect(payload_msg, self.__local_node)
-                self.__local_node.route_internal(route_msg)
-
                 # Send a reply to the contact node.
                 self.__join_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ACCEPT)
                 route_msg = RouteDirect(self.__join_msg, message.contact_node)
@@ -380,17 +368,14 @@ class JoinProcessor(VisitorMessage):
             self.set_busy(False)
 
         else:
-            join_error = STJoinError()
+            join_error = STJoinError(message, "Unrecognized join request.")
 
             route_msg = RouteDirect(join_error, message.joining_node)
             self.__local_node.route_internal(route_msg)
 
     def visit_STJoinError(self, message):
-        print("visit_STJoinError")
-
-        # TODO: Add some code.
-        #
-        #        
+        self.__reset_join_state()
+        raise JoinException(message.reason)
 
     def compute_partition_id(self, message):
         """Compute a "Partition ID" for the joining node."""
@@ -482,4 +467,19 @@ class JoinProcessor(VisitorMessage):
         LOGGER.log(logging.DEBUG, "[DBG] SNJoinReply - Process")
         NeighbourhoodNet.repair_level(self.__local_node, self.__local_node.neighbourhood, 0, message.neightbours)
 
+        # The contact node for SkipTree is the left or right neighbour.
+        node_left = self.__local_node.neighbourhood.get_neighbour(Direction.LEFT, 0)
+        node_right = self.__local_node.neighbourhood.get_neighbour(Direction.RIGHT, 0)
+
+        prefix_size_left = self.__local_node.name_id.get_longest_prefix_length(node_left.name_id)
+        prefix_size_right = self.__local_node.name_id.get_longest_prefix_length(node_right.name_id)
+
+        contact_node = node_left
+        if(prefix_size_left < prefix_size_right):
+            contact_node = node_right
+
+        # Launch the SkipTree joining.
+        payload_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
+        route_msg = RouteDirect(payload_msg, contact_node)
+        self.__local_node.route_internal(route_msg)
 

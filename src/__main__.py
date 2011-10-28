@@ -7,7 +7,7 @@ import threading
 # ResumeNet imports
 from localevent import MessageDispatcher
 
-from messages import RouteDirect, RouteByNumericID
+from messages import RouteByNumericID
 from messages import SNPingRequest
 
 from network import InRequestManager
@@ -74,8 +74,7 @@ class ThreadTalker(threading.Thread):
 
         self.__menu = list()
         self.__menu.append(("Display local node information.", self.__display))
-        self.__menu.append(("Send a join message, SkipNet.", self.__send_join_skipnet))
-        self.__menu.append(("Send a join message, SkipTree.", self.__send_join_skiptree))
+        self.__menu.append(("Send a join message (SkipTree).", self.__send_join_skiptree))
         self.__menu.append(("Send a leave message.", self.__send_leave))
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
 
@@ -116,17 +115,6 @@ class ThreadTalker(threading.Thread):
         print("Action - Display the local node CPE")
         print(self.__local_node.cpe.__repr__())
 
-    def __send_join_skipnet(self):
-        print("Action - Send a join message - SkipNet")
-
-        # Get the bootstrap contact
-        print("Enter the bootstrap contact information")
-        print("Port (2000):")
-        port = int(input())
-        boot_net_info = NetNodeInfo(("127.0.0.1", port))
-
-        self.__local_node.join(boot_net_info)
-
     def __send_join_skiptree(self):
         print("Action - Send a join message - SkipTree")
 
@@ -136,7 +124,7 @@ class ThreadTalker(threading.Thread):
         port = int(input())
         boot_net_info = NetNodeInfo(("127.0.0.1", port))
 
-        self.__local_node.join2(boot_net_info)
+        self.__local_node.join(boot_net_info)
 
     def __send_leave(self):
         print("Action - Send a leave message")
@@ -148,8 +136,7 @@ class ThreadTalker(threading.Thread):
         # Get the bootstrap contact
         print("Enter the numeric ID :")
 
-        take = input()
-        num_id = NumericID(take)
+        num_id = NumericID(input())
 
         payload_msg = SNPingRequest(self.__local_node, 0)
         route_msg = RouteByNumericID(payload_msg, num_id)
@@ -248,10 +235,7 @@ class ThreadTest(threading.Thread):
         print("Hello world  !")
 
 
-from equation import Dimension
-from equation import Component
-from equation import SpacePart
-from equation import DataStore
+from nodeid import NameID
 
 if __name__ == "__main__":
 
@@ -268,49 +252,15 @@ if __name__ == "__main__":
 
         print("Place to test little code.")
 
-        th = ThreadTest()
-        th.start()
+        nameA = NameID("World")
+        nameB = NameID("WakeUp")
+        nameC = NameID("WorldUp")
 
-        #
-        #
+        print(nameA)
 
-        dimA = Dimension("dimA")
-        dimB = Dimension("dimB")
-        dimC = Dimension("dimC")
-        dimD = Dimension("dimD")
+        print(nameA.get_longest_prefix_length(nameA))
+        print(nameA.get_longest_prefix_length(nameB))
+        print(nameA.get_longest_prefix_length(nameC))
 
-        #
-        #
-
-        spA = SpacePart([Component(dimA, 0), Component(dimC, 1)])
-        spB = SpacePart([Component(dimA, 1)])
-        spC = SpacePart([Component(dimC, 2)])
-        spD = SpacePart([Component(dimB, 2), Component(dimC, 3)])
-
-        #
-        #
-        dataStore = DataStore()
-
-        dataStore.add(spA, "A")
-        dataStore.add(spB, "B")
-        dataStore.add(spC, "C")
-        dataStore.add(spD, "D")
-
-        dataStore.print_debug()
-        print(dataStore.get_partition_value())
-
-
-        print("---- ---- ---- ---- ---- ---- ---- ----")
-
-        while True:
-            try:
-                print("\r\nDo you want to display an extra message ?")
-                choice = int(input())
-                if(choice == 1):
-                    th.go()
-                else:
-                    pass
-            except ValueError:
-                print("\r\n")
-
+        print(nameC.get_longest_prefix_length(nameA))
 

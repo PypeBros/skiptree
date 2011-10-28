@@ -60,6 +60,9 @@ class VisitorRoute(object):
     def visit_RouteByPayload(self, message):
         pass
 
+    def visit_RouteByCPE(self, message):
+        pass
+
 
 class VisitorMessage(object):
     """Interface that must be implement by a class that visit Message."""
@@ -596,24 +599,14 @@ class STJoinReply(CtrlMessage):
 
 def STJoinError(CtrlMessage):
 
-    def __init__(self, message=None):
+    def __init__(self, original_message=None, reason=""):
         CtrlMessage.__init__(self)
 
         self.__reason = None
-        self.__original_msg = message
+        self.__original_message = original_message
 
     #
     # Properties
-
-    @property
-    def original_message(self):
-        """Return the message that lead to the error."""
-        return self.__original_msg
-
-    @original_message.setter
-    def original_message(self, value):
-        """Set the message that lead to the error."""
-        self.__original_msg = value
 
     @property
     def reason(self):
@@ -624,6 +617,27 @@ def STJoinError(CtrlMessage):
     def reason(self, value):
         """Set the reason of the error."""
         self.__reason = value
+
+    @property
+    def original_message(self):
+        """Return the sent message that lead to the error."""
+        return self.__original_message
+
+    @original_message.setter
+    def original_message(self, value):
+        """Set the sent message that lead to the error."""
+        self.__original_message = value
+
+
+class JoinException(Exception):
+
+    def __init__(self, message):
+        Exception.__init__(self)
+
+        self.__message = message
+
+    def __str__(self):
+        return repr(self.__message)
 
 # ------------------------------------------------------------------------------------------------
 

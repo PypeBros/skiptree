@@ -43,6 +43,16 @@ class NameID(NodeID):
     def name(self):
         return self.__name
 
+    def get_longest_prefix_length(self, name_id):
+        """Return the length of the longest common prefix."""
+        length, up_bound = 0, min(len(self), len(name_id))
+        for i in range(up_bound):
+            if(self.name[i] != name_id.name[i]):
+                break
+            else:
+                length += 1
+        return length
+
     #
     # Overwritten    
 
@@ -51,6 +61,9 @@ class NameID(NodeID):
 
     def __int__(self):
         return int(self.__name)
+
+    def __len__(self):
+        return len(self.__name)
 
     #
     # Default comparison
@@ -153,7 +166,7 @@ class NumericID(NodeID):
 
     def get_longest_prefix_length(self, numeric_id):
         """Return the length of the longest common prefix."""
-        i, length, up_bound = 0, 0, max(self.get_nb_digit(), numeric_id.get_nb_digit())
+        length, up_bound = 0, max(self.get_nb_digit(), numeric_id.get_nb_digit())
         for i in range(up_bound):
             if(self.get_digit(i) != numeric_id.get_digit(i)):
                 break

@@ -182,19 +182,15 @@ class Node(object):
     #
 
     def join(self, boot_net_info):
-        """Join the overlay."""
-        # Only the boot_net_info is used.
-        contact_node = Node(None, NumericID(), boot_net_info)
-
-        # Join SkipNet
-        payload_msg = SNJoinRequest(self)
-        route_msg = RouteDirect(payload_msg, contact_node)
-        self.route_internal(route_msg)
-
-    def join2(self, boot_net_info):
         """Start joining the SkipTree overlay."""
         # Only the boot_net_info is used.
         contact_node = Node(None, NumericID(), boot_net_info)
+
+        if(False):
+            # Join SkipNet
+            payload_msg = SNJoinRequest(self)
+            route_msg = RouteDirect(payload_msg, contact_node)
+            self.route_internal(route_msg)
 
         # To join the SkipTree, the node must first join the SkipNet overlay. 
         payload_1 = SNJoinRequest(self)
@@ -207,9 +203,11 @@ class Node(object):
 
     def leave(self):
         """Start leaving the SkipTree overlay."""
-        #TODO: move the SkipTree data to the remaining node.        
+        #TODO: move the SkipTree data to the remaining node before leaving.
+        self.__leave_skiptree()
 
-        # Send a disconnection message to all SkiptNet neighbours.        
+    def __leave_skiptree(self):
+        """Send a disconnection message to all SkiptNet neighbours."""
         neighbours = self.__neighbourhood.get_all_unique_neighbours()
         for neighbour in neighbours:
             if(neighbour != self):

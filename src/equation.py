@@ -353,7 +353,7 @@ class DataStore(object):
     def get_partition_value(self):
         """Return a pair [best dimension, best partition value, data from left, data from right]."""
         if(len(self.__data_by_dimension) <= 0):
-            raise ValueError()
+            raise ValueError("There isn't any data in DataStore.")
 
         # Sort the 'CompCounter' for the best split to be in first position.
         comp_counters = list(self.__data_by_dimension.values())
