@@ -250,12 +250,12 @@ class RouteByPayload(RouteMessage):
 
 
 class RouteByCPE(RouteMessage):
-
+    
     def __init__(self, payload, space_part):
         RouteMessage.__init__(self, payload)
 
         self.__space_part = copy.deepcopy(space_part)
-        self.__limit = Range(None, None, False, False)
+        self.__limit = Range(None, None, False, False, False)
 
     @property
     def space_part(self):
@@ -273,6 +273,7 @@ class RouteByCPE(RouteMessage):
         self.__limit = new_limit
 
     def accept(self, visitor):
+        # see localevent.py : RouterVisitor.visit_RouteByCPE
         return visitor.visit_RouteByCPE(self)
 
 # ------------------------------------------------------------------------------------------------
@@ -540,7 +541,7 @@ class STJoinReply(CtrlMessage):
         self.__cpe = None
         self.__partition_id = None
         self.__data = None
-
+        self.__phase = state
     #
     # Properties
 
@@ -593,7 +594,7 @@ class STJoinReply(CtrlMessage):
     #
 
     def accept(self, visitor):
-        visitor.visit_STJoinRequest(self)
+        visitor.visit_STJoinReply(self)
 
 
 def STJoinError(CtrlMessage):
@@ -670,6 +671,27 @@ class IdentityReply(AppMessage):
     def accept(self, visitor):
         visitor.visit_IdentityReply(self)
 
+
+
+class InsertionRequest(AppMessage):
+    """This class represents an InsertionRequest."""
+
+    def __init__(self, puredata, spacepart):
+        AppMessage.__init__(self)
+        self.__data = puredata
+        self.__key  = spacepart
+
+    @property
+    def data(self):
+        return self.__data
+
+    @property
+    def key(self):
+        return self.__key
+
+    def accept(self, visitor):
+        visitor.visit_InsertData(self)
+        ## see localevent.py ... DatastoreVisitor
 
 class EncapsulatedMessage(AppMessage):
     """This class encapsulates a message that should be routed in a different way. 

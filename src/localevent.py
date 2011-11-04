@@ -1,3 +1,8 @@
+## Prototype implementation for skiptree
+##  do not expect things to keep working if you start removing nodes.
+
+
+
 # System imports
 import copy
 import logging
@@ -13,7 +18,7 @@ from messages import SNJoinRequest, SNJoinReply, SNLeaveReply
 from messages import STJoinReply, STJoinRequest, STJoinError, JoinException
 from messages import IdentityReply
 from messages import NeighbourhoodNet
-
+from routing import RouterReflect
 from nodeid import NodeID, PartitionID
 from util import Direction
 
@@ -53,23 +58,35 @@ class MessageDispatcher(object):
         #TODO: Change exception management, local_node comparison  
         while True:
             message = self.__queue.get()
-            try:
-                destinations = message.accept(self.__visitor_routing)
-                assert destinations != None, "Destinations in the LocalEvent is None."
-                for next_hop, message in destinations:
-                    if(next_hop != None):
-                        if(next_hop.net_info == self.__local_node.net_info):
-                            message.payload.accept(self.__visitor_processing)
-                        else:
-                            self.__local_node.sender.send_msg(message, next_hop)
+#            try:
+            destinations = message.accept(self.__visitor_routing)
+            assert destinations != None, "Destinations in the LocalEvent is None."
+            for next_hop, message in destinations:
+                if(next_hop != None):
+                    if(next_hop.net_info == self.__local_node.net_info):
+                        message.payload.accept(self.__visitor_processing)
                     else:
-                        assert False , "Next hop == None"
+                        self.__local_node.sender.send_msg(message, next_hop)
+                else:
+                    assert False , "Next hop == None"
 
-            except:
-                print("There is an error in the message dispatcher: ", sys.exc_info()[0], sys.exc_info())
-            finally:
-                self.__queue.task_done()
+#             except:
+#                 # http://docs.python.org/library/sys.html#sys.exc_info
+#                 print("There is an error in the message dispatcher: ", sys.exc_info()[0], sys.exc_info())
+#             finally:
+            self.__queue.task_done()
 
+# Visitor Message is handling the application-level processing,
+# while the RouterVisitor handles the network-level message.
+class DatastoreProcessor(object):
+    def __init__(self, node):
+        self.__local_node = node
+
+    def insertData(self, message):
+        """ expect message @= InsertionRequest """
+        print(message,"has reached",self.__localnode)
+        ### XXX test the message.key matches by local CPEs.
+        self.__local_node.data_store.add(message.key, message.value)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -80,6 +97,7 @@ class RouterVisitor(VisitorRoute):
 
         self.__local_node = local_node
         self.__router = Router(local_node)
+        self.__reflector = RouterReflect()
 
     # Every method in this class should return a list of pair (destination, message)
     # The destination is a class 'Node' and the message is a (sub)class of 'RouteMessage'.
@@ -97,7 +115,22 @@ class RouterVisitor(VisitorRoute):
         return message.route(self.__local_node)
 
     def visit_RouteByCPE(self, message):
-        raise NotImplementedError
+        return self.__reflector.__by_cpe_get_next_hop_insertion(self.__localnode, message)
+        # MessageDispatcher.dispatch() will be happy with a list of <neighbour, message>
+
+##      Traceback (most recent call last):
+##  File "/usr/lib/python3.1/threading.py", line 516, in _bootstrap_inner
+##    self.run()
+##  File "src/__main__.py", line 51, in run
+##    self.__dispatcher.dispatch()
+##  File "/beetle/martin/work/DISco/skiptree-clerinx/ResumeNet/src/localevent.py", line 62, in dispatch
+##    destinations = message.accept(self.__visitor_routing)
+##  File "/beetle/martin/work/DISco/skiptree-clerinx/ResumeNet/src/messages.py", line 277, in accept
+##    return visitor.visit_RouteByCPE(self)
+##  File "/beetle/martin/work/DISco/skiptree-clerinx/ResumeNet/src/localevent.py", line 117, in visit_RouteByCPE
+##    return RouterReflect.__by_cpe_get_next_hop_insertion(self.__localnode, message)
+##NameError: global name 'RouterReflect' is not defined
+
 
 
 class Router(object):
@@ -197,12 +230,17 @@ class ProcessorVisitor(VisitorMessage):
 
         self.__local_node = node
         self.__join_processor = JoinProcessor(node)
+        self.__data_processor = DatastoreProcessor(node)
 
     #
     # Dispatching for the RouteByPayload messages.
 
     def visit_RouteByPayload(self, message):
         message.process(self.__local_node)
+
+    def visit_InsertData(self, message):
+        self.__data_processor.insertData(message)
+        
 
     #
     # Dispatching for the "Join" messages.
@@ -290,9 +328,6 @@ class JoinProcessor(VisitorMessage):
         """Set the state of the JoinProcessor."""
         self.__join_busy = value
 
-    #
-    #
-
     def visit_STJoinRequest(self, message):
         print("visit_STJoinRequest")
 
@@ -361,7 +396,8 @@ class JoinProcessor(VisitorMessage):
                 # Set data received from contact node.
                 self.__local_node.partition_id = message.partition_id
                 self.__local_node.cpe = message.cpe
-
+                for data in message.data:
+                    self.__local_node.data_store.add(data[0],data[1])
                 # Send a reply to the contact node.
                 self.__join_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ACCEPT)
                 route_msg = RouteDirect(self.__join_msg, message.contact_node)
@@ -419,6 +455,7 @@ class JoinProcessor(VisitorMessage):
         new_local_node = InternalNode(new_side_local, cut_dimension, cut_value)
         new_local_cpe = copy.deepcopy(self.__local_node.cpe)
         new_local_cpe.add_node(new_local_node)
+        print("NEW CPE:: ", new_local_cpe)
 
         # Split the data.
         if(new_side_join == Direction.LEFT):

@@ -243,7 +243,10 @@ class Component(object):
 # ------------------------------------------------------------------------------------------------
 
 class SpacePart(object):
-
+    """ this is the multi-value part of a 'data point',
+    as opposed to the data part, which holds Plain Old Data
+    along which no split can be performed."""
+    
     def __init__(self, coordinates=None):
         """
         Initialize a SpacePart.
@@ -295,7 +298,7 @@ class SpacePart(object):
     # Overwritten
 
     def __repr__(self):
-        return "SP"
+        return "<@SP@>"
 
     #
     # Debug methods
@@ -373,9 +376,10 @@ class DataStore(object):
 
     def print_debug(self):
         print("\r\nDataStore - BEG")
-        keys = list(self.__data_by_dimension.keys())
-        keys.sort()
-        for key in keys:
+        kkeys = list(self.__data_by_dimension.keys())
+        kkeys.sort()
+        for key in kkeys:
+            print ("K ",key,":",key.__class__)
             comp_counter = self.__data_by_dimension.get(key)
             comp_counter.print_debug()
         else:
@@ -383,7 +387,8 @@ class DataStore(object):
 
 
 class CompCounter(object):
-
+    """ Count components ... receives all data for one dimension and
+        pre-computes a split along that dimension."""
     def __init__(self, dimension):
         self.__dimension = dimension
 
@@ -709,6 +714,10 @@ class InternalNode(Component):
 
         return section
 
+    # cannonical name for "toString" in python.
+    def __repr__(self):
+        return "(node "+Component.__repr__(self)+" "+str(self.__direction)+")"
+    
 
 class CPEError(Exception):
     """A Characteristic Plan Equation (CPE) Exception."""
@@ -785,7 +794,9 @@ the Node that delimits the area managed by the Node."""
 
     def __update_dimension_count(self, dimension, value):
         """Update a counter for a dimension."""
-        self.__dim_count[dimension] += value
+        if (not dimension in self.__dim_count):
+            self.__dim_count[dimension]=0
+        self.__dim_count[dimension]+= value
 
     #
     #
@@ -876,6 +887,6 @@ the Node that delimits the area managed by the Node."""
         for inode in self.__internal_nodes:
             m_repr += ("\r\n" + inode.__repr__())
         else:
-            m_repr += "No internal node."
+            m_repr += "</equation>"
         return m_repr
 

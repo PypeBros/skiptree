@@ -25,12 +25,13 @@ LOGGER.addHandler(LOG_HANDLER)
 class RouterReflect(object):
 
     def __init__(self):
-        self.__local_node = None
+        pass
+    # those could be static.
 
     #
-    # Route by CPE (for Insertion)
-
-    def __by_cpe_get_next_hop_insertion(self, local_node, message):
+    # Route by CPE (for *DATA* Insertion)
+    #  only valid if message ISA RouteByCPE.
+    def __by_cpe_get_next_hop_insertion(self,local_node, message):
         try:
             # Add virtual dimensions for the undefined ones.
             dim_cpe = local_node.cpe.dimensions
@@ -52,6 +53,8 @@ class RouterReflect(object):
 
                 new_comp = Component(dim, virt_val, True)
                 message.space_part.set_component(new_comp)
+
+            # NEAT! we now have a routable message ^_^
 
             return self.__by_cpe_get_next_hop_default(local_node, message)
 

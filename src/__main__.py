@@ -7,12 +7,14 @@ import threading
 # ResumeNet imports
 from localevent import MessageDispatcher
 
-from messages import RouteByNumericID
-from messages import SNPingRequest
+from messages import RouteByNumericID, RouteByCPE
+from messages import SNPingRequest, InsertionRequest
 
 from network import InRequestManager
 from node import NetNodeInfo, Node
 from nodeid import NumericID, NameID
+from equation import SpacePart, Component, Dimension
+
 
 # ------------------------------------------------------------------------------------------------
 
@@ -78,6 +80,8 @@ class ThreadTalker(threading.Thread):
         self.__menu.append(("Send a join message (SkipTree).", self.__send_join_skiptree))
         self.__menu.append(("Send a leave message.", self.__send_leave))
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
+        self.__menu.append(("Send data to the skiptree.", self.__send_data))
+        self.__menu.append(("Dump data store", self.__dump_store))
 
     def run(self):
         time.sleep(0.5)
@@ -101,6 +105,17 @@ class ThreadTalker(threading.Thread):
 
         actions[index_action][1]()
 
+    def __dump_store(self):
+        self.__local_node.data_store.print_debug()
+    
+    def __send_data(self):
+        keypart = eval(input())
+        valuevector=[self.__local_node.net_info.get_port()]
+        insertRQ = RouteByCPE(InsertionRequest(valuevector,keypart),keypart)
+        # watch out for undefined keypart, as RouteByCPE could change it.
+        #  if you don't like it, use the plain "search" routing.
+        self.__local_node.route_internal(insertRQ)
+
     def __display(self):
         display_actions = list()
         display_actions.append(("Display the local node.", self.__display_node))
@@ -117,12 +132,14 @@ class ThreadTalker(threading.Thread):
         print(self.__local_node.cpe.__repr__())
 
     def __add_data(self):
-        #TODO: !!!
-        # Create a dimension.
-        # Create a component.
-        # Create a Space_Part
-        # self.__local_node.data_store.add()
-        pass
+        keypart = eval(input())
+        # "SpacePart([Component(Dimension('ip'),'127.0.0.1'), Component(Dimension('timestamp'),'13:37')])")
+        
+        # XXX set_component does not properly check the key is a Dimension.
+        keypart.set_component(Component(Dimension('portno'),'80'))
+        purevalues = [1234,5678,9999];
+        self.__local_node.data_store.add(keypart, purevalues)
+#        pass
 
     def __send_join_skiptree(self):
         print("Action - Send a join message - SkipTree")
@@ -157,57 +174,57 @@ def main():
 
     INDEX_LOCAL_IP, INDEX_LOCAL_PORT, INDEX_NAME_ID, INDEX_NUM_ID = range(1, 5)
 
-    try:
-        threads = []
-        local_address = (sys.argv[INDEX_LOCAL_IP], int(sys.argv[INDEX_LOCAL_PORT]))
+#    try:
+    threads = []
+    local_address = (sys.argv[INDEX_LOCAL_IP], int(sys.argv[INDEX_LOCAL_PORT]))
 
-        # Create the local node information
-        name_id = NameID(sys.argv[INDEX_NAME_ID])
-        numeric_id = NumericID(sys.argv[INDEX_NUM_ID])
-        net_info = NetNodeInfo(local_address)
+    # Create the local node information
+    name_id = NameID(sys.argv[INDEX_NAME_ID])
+    numeric_id = NumericID(sys.argv[INDEX_NUM_ID])
+    net_info = NetNodeInfo(local_address)
 
-        local_node = Node(name_id, numeric_id, net_info)
+    local_node = Node(name_id, numeric_id, net_info)
 
-        print("NameID: ", local_node.name_id.name, sep="")
-        print("NumericID: ", local_node.numeric_id.get_numeric_id_hex(), " (", int(local_node.numeric_id), ")", sep="")
+    print("NameID: ", local_node.name_id.name, sep="")
+    print("NumericID: ", local_node.numeric_id.get_numeric_id_hex(), " (", int(local_node.numeric_id), ")", sep="")
 
-        # Create the sub-parts of the program
-        th_dispatcher = ThreadDispatcher(local_node)
-        threads.append(th_dispatcher)
+    # Create the sub-parts of the program
+    th_dispatcher = ThreadDispatcher(local_node)
+    threads.append(th_dispatcher)
 
-        th_listener = ThreadListener(local_address, th_dispatcher.dispatcher)
-        threads.append(th_listener)
+    th_listener = ThreadListener(local_address, th_dispatcher.dispatcher)
+    threads.append(th_listener)
 
-        th_talker = ThreadTalker(local_node)
-        threads.append(th_talker)
+    th_talker = ThreadTalker(local_node)
+    threads.append(th_talker)
 
-        # Launch the sub-parts of the program
-        for th in threads:
-            if (not th.is_alive()):
-                th.daemon = True
-                th.start()
+    # Launch the sub-parts of the program
+    for th in threads:
+        if (not th.is_alive()):
+            th.daemon = True
+            th.start()
 
 
-        # Active wait unless there is no more active threads or a stopped one.        
-        all_active = True
-        while 0 < len(threads):
-            new_threads = list()
-            for t in threads:
-                if(t.is_alive()):
-                    new_threads.append(t)
-                t.join(1)
-                all_active &= t.is_alive()
-            threads = new_threads
+    # Active wait unless there is no more active threads or a stopped one.        
+    all_active = True
+    while 0 < len(threads):
+        new_threads = list()
+        for t in threads:
+            if(t.is_alive()):
+                new_threads.append(t)
+            t.join(1)
+            all_active &= t.is_alive()
+        threads = new_threads
 
-            if(not all_active):
-                LOGGER.log(logging.WARNING, "All components haven't been started correctly.")
-                break
+        if(not all_active):
+            LOGGER.log(logging.WARNING, "All components haven't been started correctly.")
+            break
 
-    except KeyboardInterrupt:
-        pass
+#     except KeyboardInterrupt:
+#         pass
 
-    except:
-        LOGGER.log(logging.WARNING, "There is an error in the main thread: " + str(sys.exc_info()[0]))
+#     except:
+#         LOGGER.log(logging.WARNING, "There is an error in the main thread: " + str(sys.exc_info()[0]))
 
 
 
