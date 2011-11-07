@@ -83,10 +83,10 @@ class DatastoreProcessor(object):
         self.__local_node = node
 
     def insertData(self, message):
-        """ expect message @= InsertionRequest """
-        print(message,"has reached",self.__localnode)
+        """ expect message ISA InsertionRequest """
+        print(message,"has reached",self.__local_node)
         ### XXX test the message.key matches by local CPEs.
-        self.__local_node.data_store.add(message.key, message.value)
+        self.__local_node.data_store.add(message.key, message.data)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -115,7 +115,7 @@ class RouterVisitor(VisitorRoute):
         return message.route(self.__local_node)
 
     def visit_RouteByCPE(self, message):
-        return self.__reflector.__by_cpe_get_next_hop_insertion(self.__localnode, message)
+        return self.__reflector.by_cpe_get_next_hop_insertion(self.__local_node, message)
         # MessageDispatcher.dispatch() will be happy with a list of <neighbour, message>
 
 ##      Traceback (most recent call last):

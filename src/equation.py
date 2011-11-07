@@ -20,7 +20,7 @@ LOGGER.addHandler(LOG_HANDLER)
 # ------------------------------------------------------------------------------------------------
 
 class Range(object):
-
+    ## 0_0 what is this, exactly ?
     def __init__(self, p_min=None, p_max=None, min_included=True, max_included=True, strict=True):
         if(strict and p_min > p_max):
             raise ValueError("Range can't be created: the low bound exceeds high bound.")
@@ -73,18 +73,23 @@ class Range(object):
 
     def is_all_point_after_value(self, value):
         """Does all units of the range appear after the value ?"""
+        value = value.value if value.__class__ == Component else value
         return not self.min_unbounded and ((not self.min_included and self.min >= value) or (self.min_included and self.min > value))
 
     def is_all_point_before_value(self, value):
         """Does all units of the range appear before the value ?"""
+        value = value.value if value.__class__ == Component else value
         return not self.max_unbounded and ((not self.max_included and self.max <= value) or (self.max_included and self.max < value))
 
     def is_any_point_after_value(self, value):
         """Does at least one point of the range appear after the value ?"""
+        value = value.value if value.__class__ == Component else value
         return self.max_unbounded or self.max > value
 
     def is_any_point_before_value(self, value):
         """Does at least one point of the range appear before the value ?"""
+        value = value.value if value.__class__ == Component else value
+        print("any_point_before?",value.__class__,value,self.min.__class__,self.min)
         return self.min_unbounded or self.min < value
 
     def includes_value(self, value):
@@ -183,9 +188,17 @@ class Dimension(object):
 class Component(object):
 
     def __init__(self, dimension, value, virtual=False):
+        ## what should be the type of value ??
         self.__dimension = dimension
         self.__value = value
+        ## test1171502
+#         if (value.__class__ == Range):
+#             self.__value = value
+#         else:
+#             self.__value = Range(value,value) # both included :)
+#/test
         self.__virtual = virtual
+        
 
     #
     # Properties
@@ -265,10 +278,15 @@ class SpacePart(object):
 
     @property
     def range(self):
-        """Indicates if the SpacePart describes a range."""
+        """Indicates if the SpacePart describes a range.
+        ( it's enough for *one* of the dimension to be a range for the whole
+          SpacePart to have the 'range' property. )
+        """
         result = False
         for dimension, component in self.__coordinates.items():
-            result |= not (component.value.is_single_value())
+            ## 0_0 only valid if component.value is already a Range !?
+            if (component.value.__class__ == Range):
+                result |= not (component.value.is_single_value())
         return result
 
     @property
@@ -276,8 +294,14 @@ class SpacePart(object):
         """Return the dimensions that appears in the SpacePart."""
         return set(self.__coordinates.keys())
 
-    #
-    #    
+    def val2range(self):
+        if (self.range):
+            return self.__coordinates.items()
+        ranges=[];
+        for dimension, component in self.__coordinates.items():
+            ranges.append(Component(dimension, Range(component.value, component.value)))
+        return ranges
+                                        
 
     def exists(self, dimension):
         """Indicate if the dimension 'dimension' have been defined for this SpacePart."""
@@ -645,41 +669,47 @@ class InternalNode(Component):
         """Return True if the range in under this InternalNode responsibility."""
         result = False
         if(self.__direction == Direction.LEFT):
-            result = self.__is_left(m_range)
+            result = self.__is_left(m_range.value if (m_range.__class__==Component) else m_range)
         else:
             assert self.__direction == Direction.RIGHT
-            result = self.__is_right(m_range)
+            result = self.__is_right(m_range.value if (m_range.__class__==Component) else m_range)
         return result
 
     def is_more_on_the_left(self, m_range):
         """Return True if and additional part of the range is managed by a Left InternalNode."""
         result = False
         if(self.__direction == Direction.RIGHT):
-            result = self.__is_left(m_range)
+            result = self.__is_left(m_range.value if (m_range.__class__==Component) else m_range)
         return result
 
     def is_more_on_the_right(self, m_range):
         """Return True if and additional part of the range is managed by a Right InternalNode."""
         result = False
         if(self.__direction == Direction.LEFT):
-            result = self.__is_right(m_range)
+            result = self.__is_right(m_range.value if (m_range.__class__==Component) else m_range)
         return result
 
     def __is_left(self, m_range):
         """Is a range on the left of the internal cutting plane?"""
         # The range must be at the left of a value (range <= value).
-        # The only way for a range to be Left managed is to have at least one point before the cutting value or to be equal.        
-        return m_range.is_any_point_before_value(self.value) or m_range.includes_value(self.value)
+        # The only way for a range to be Left managed is to have at least one point before the cutting value or to be equal.
+        if (m_range.__class__ == Range):
+            return m_range.is_any_point_before_value(self.value) or m_range.includes_value(self.value)
+        else:
+            print("right-hand type: ",m_range.__class__)
+            return m_range <= self.value
+        
 
     def __is_right(self, m_range):
         """Is a range on the right of the internal cutting plane?"""
         # The range must be at the right of a value (value < range).
         # The only way for a range to be Right managed is to have at least one point after the cutting value.        
-        return m_range.is_any_point_after_value(self.value)
-
-
-    #    
-    #
+        if (m_range.__class__ == Range):
+            return m_range.is_any_point_after_value(self.value)
+        else:
+            print("right-hand type: ",m_range.__class__)
+            return self.value < m_range
+        
 
     @staticmethod
     def compute_level(k, depth):
@@ -840,7 +870,8 @@ the Node that delimits the area managed by the Node."""
 
                 else:
                     # The range is managed by the opposite side.
-                    opposite_side = Direction.get_opposite(inode.dimension.direction)
+                    # 0_0 opposite_side = Direction.get_opposite(inode.dimension.direction)
+                    opposite_side = Direction.get_opposite(inode.direction)
                     left |= (opposite_side == Direction.LEFT)
                     right |= (opposite_side == Direction.RIGHT)
                     break

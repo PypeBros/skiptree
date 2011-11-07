@@ -31,7 +31,8 @@ class RouterReflect(object):
     #
     # Route by CPE (for *DATA* Insertion)
     #  only valid if message ISA RouteByCPE.
-    def __by_cpe_get_next_hop_insertion(self,local_node, message):
+    #  only valid if message.space_part is a Range, not a Component (?)
+    def by_cpe_get_next_hop_insertion(self,local_node, message):
         try:
             # Add virtual dimensions for the undefined ones.
             dim_cpe = local_node.cpe.dimensions

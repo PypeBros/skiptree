@@ -253,7 +253,7 @@ class RouteByCPE(RouteMessage):
     
     def __init__(self, payload, space_part):
         RouteMessage.__init__(self, payload)
-
+        #assert(space_part.range)
         self.__space_part = copy.deepcopy(space_part)
         self.__limit = Range(None, None, False, False, False)
 

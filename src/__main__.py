@@ -93,25 +93,30 @@ class ThreadTalker(threading.Thread):
         while True:
             try:
                 choice = -1
-                print("\r\nWitch action do you want to do ?")
+                print("\r\nWhich action do you want to do ?")
                 for i in range(len(actions)):
                     print("  ", i, ". ", actions[i][0], sep="")
                 choice = int(input())
                 if(0 <= choice and choice < len(actions)):
                     index_action = choice
                     break
+                if(choice >99):
+                    time.sleep(2)
             except ValueError:
                 print("\r\n")
-
+        
+        LOGGER.log(logging.DEBUG, "[ACTION] "+actions[index_action][0])
         actions[index_action][1]()
+        LOGGER.log(logging.DEBUG, "[ACTION]  completed.")
 
     def __dump_store(self):
         self.__local_node.data_store.print_debug()
-    
+
     def __send_data(self):
         keypart = eval(input())
         valuevector=[self.__local_node.net_info.get_port()]
-        insertRQ = RouteByCPE(InsertionRequest(valuevector,keypart),keypart)
+        searchpart= SpacePart(keypart.val2range())
+        insertRQ = RouteByCPE(InsertionRequest(valuevector,keypart),searchpart)
         # watch out for undefined keypart, as RouteByCPE could change it.
         #  if you don't like it, use the plain "search" routing.
         self.__local_node.route_internal(insertRQ)
@@ -124,11 +129,9 @@ class ThreadTalker(threading.Thread):
         self.__get_action(display_actions)
 
     def __display_node(self):
-        print("Action - Display the local node")
         print(self.__local_node.__repr__())
 
     def __display_node_cpe(self):
-        print("Action - Display the local node CPE")
         print(self.__local_node.cpe.__repr__())
 
     def __add_data(self):
@@ -142,8 +145,6 @@ class ThreadTalker(threading.Thread):
 #        pass
 
     def __send_join_skiptree(self):
-        print("Action - Send a join message - SkipTree")
-
         # Get the bootstrap contact
         print("Enter the bootstrap contact information")
         print("Port (2000):")
@@ -153,8 +154,6 @@ class ThreadTalker(threading.Thread):
         self.__local_node.join(boot_net_info)
 
     def __send_leave(self):
-        print("Action - Send a leave message")
-
         self.__local_node.leave()
 
     def __send_RouteByNumericID(self):
