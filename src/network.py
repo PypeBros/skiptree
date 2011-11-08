@@ -31,7 +31,7 @@ class NetStringTools(object):
     """This uses NetStrings protocol to break up the input into strings."""
 
     """The maximum length (in bytes) of accepted message."""
-    MAX_LENGTH = 100 * 1024
+    MAX_LENGTH = 16*1024*1024
 
     """The state in witch this object could be."""
     STATE_LENGTH, STATE_DATA, STATE_END = range(3)
@@ -58,16 +58,17 @@ class NetStringTools(object):
 
     def format_data(self, payload):
         """Format a message in the NetString format."""
-        data_to_send = bytes(str(len(payload)), "Utf8")
-        data_to_send += self.DEL_LENGTH.encode("Utf8")
-        data_to_send += payload
-        data_to_send += self.DEL_DATA.encode("Utf8")
+        data_to_send = bytes(str(len(payload)), "Utf8") # the length
+        data_to_send += self.DEL_LENGTH.encode("Utf8")  #  ;
+        data_to_send += payload                         # the data (bytes(), already)
+        data_to_send += self.DEL_DATA.encode("Utf8")    #  ,
 
         return data_to_send
 
     def recv_data(self, data):
         """Call to process a message."""
         self.__buffer = data
+        print("NET> received",len(data),"bytes to process")
         try:
             while self.__buffer:
                 if self.__reader_state == self.STATE_DATA:
@@ -80,7 +81,7 @@ class NetStringTools(object):
                     raise RuntimeError("State is not DATA, END or LENGTH.")
 
         except NetStringParseError as e:
-            LOGGER.log(logging.WARNING, "A buggy message have been received.")
+            LOGGER.log(logging.WARNING, "A buggy message have been received.",e)
             self.reset_state()
 
     def _data_received(self, data):
@@ -99,10 +100,12 @@ class NetStringTools(object):
             try:
                 self.__reader_length = self.__reader_length * (10 ** len(length)) + int(length)
             except OverflowError:
-                raise NetStringParseError("Message length too long.")
+                raise NetStringParseError("Message length too long."+str(length,"ASCII"))
+            if self.__reader_length > 65536:
+                print("NET> large message ahead:",str(self.__reader_length),"bytes.")
 
             if self.__reader_length > self.MAX_LENGTH:
-                raise NetStringParseError("Message length too long.")
+                raise NetStringParseError("Message length too long."+str(length,"ASCII"))
 
         if data != None:
             self.__data = bytes()
@@ -137,6 +140,7 @@ class NetStringTools(object):
         if self.__reader_length == 0:
             self._data_received(self.__data)
             self.__reader_state = self.STATE_END
+        print("NET> ",str(self.__reader_length)," bytes still pending")
 
     def __do_comma(self):
         """Process the ending of a message looking for the comma delimiter."""
@@ -152,7 +156,7 @@ class ClientChannel(asyncore.dispatcher, NetStringTools):
 
 
     """The buffer size used to read from socket."""
-    RECV_SIZE = 1024
+    RECV_SIZE = 65536
 
     def __init__(self, conn_sock, channel_map, deliver_callback):
         asyncore.dispatcher.__init__(self, sock=conn_sock, map=channel_map)
@@ -330,18 +334,24 @@ class OutRequestManager(object):
             LOGGER.log(logging.DEBUG, str(msg.__class__) + " to " + dst_node.net_info.__repr__())
             payload = pickle.dumps(msg)
             net_string_msg = NetStringTools().format_data(payload)
-
+            # fix1181403
+  
             client_socket = self.__get_connection(dst_node)
+            if (len(net_string_msg)>65536):
+                print("NET> large message ahead: turns blocking on")
+                client_socket.setblocking(True)
+
             if (self.__is_online(client_socket)):
-                nb_bytes = client_socket.send(net_string_msg)
-                #LOGGER.log(logging.DEBUG, "Connection is still online : send of " + str(nb_bytes) + " bytes")
+                client_socket.sendall(net_string_msg)
+                #                    LOGGER.log(logging.DEBUG, "sent " + str(nb_bytes) + " bytes out of "+str(len(net_string_msg)))
             else:
                 self.node_disconnected(dst_node)
                 LOGGER.log(logging.WARNING, "-BIG ERR : Connection is not online !")
-
+                
         except BaseException as e:
             #TOOD: Add Timeout management.            
-            print("There is a problem.", e)
+            print("Couldn't send",str(net_string_msg)," reason: ", e)
+        client_socket.setblocking(False)
 
     def node_disconnected(self, disconnected_node):
         """Mark a node as disconnected."""

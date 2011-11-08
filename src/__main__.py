@@ -71,7 +71,7 @@ class ThreadTalker(threading.Thread):
     def __init__(self, local_node):
         """Launches the talking part of the Node"""
         threading.Thread.__init__(self)
-
+        self.__interactive=True
         self.__local_node = local_node
 
         self.__menu = list()
@@ -93,9 +93,10 @@ class ThreadTalker(threading.Thread):
         while True:
             try:
                 choice = -1
-                print("\r\nWhich action do you want to do ?")
-                for i in range(len(actions)):
-                    print("  ", i, ". ", actions[i][0], sep="")
+                if (self.__interactive):
+                    print("\r\nWhich action do you want to do ?")
+                    for i in range(len(actions)):
+                        print("  ", i, ". ", actions[i][0], sep="")
                 choice = int(input())
                 if(0 <= choice and choice < len(actions)):
                     index_action = choice
@@ -104,10 +105,11 @@ class ThreadTalker(threading.Thread):
                     time.sleep(2)
             except ValueError:
                 print("\r\n")
+                self.__interactive=True
         
-        LOGGER.log(logging.DEBUG, "[ACTION] "+actions[index_action][0])
+#        LOGGER.log(logging.DEBUG, "[ACTION] "+actions[index_action][0])
         actions[index_action][1]()
-        LOGGER.log(logging.DEBUG, "[ACTION]  completed.")
+#        LOGGER.log(logging.DEBUG, "[ACTION]  completed.")
 
     def __dump_store(self):
         self.__local_node.data_store.print_debug()
@@ -125,11 +127,20 @@ class ThreadTalker(threading.Thread):
         display_actions = list()
         display_actions.append(("Display the local node.", self.__display_node))
         display_actions.append(("Display the local node CPE.", self.__display_node_cpe))
-
+        display_actions.append(("Turn off menu display", self.__display_off))
+        display_actions.append(("Echo value", self.__display_echo))
         self.__get_action(display_actions)
 
     def __display_node(self):
         print(self.__local_node.__repr__())
+
+    def __display_off(self):
+        print("Echo off")
+        self.__interactive=False
+
+    def __display_echo(self):
+        print(input())
+        self.__interactive=True
 
     def __display_node_cpe(self):
         print(self.__local_node.cpe.__repr__())
@@ -149,7 +160,9 @@ class ThreadTalker(threading.Thread):
         print("Enter the bootstrap contact information")
         print("Port (2000):")
         port = int(input())
-        boot_net_info = NetNodeInfo(("127.0.0.1", port))
+        print("Host (127.0.0.1):")
+        host = input()
+        boot_net_info = NetNodeInfo((host, port))
 
         self.__local_node.join(boot_net_info)
 

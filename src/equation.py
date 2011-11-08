@@ -869,7 +869,7 @@ the Node that delimits the area managed by the Node."""
                     right |= inode.is_more_on_the_right(m_range)
 
                 else:
-                    # The range is managed by the opposite side.
+                    # The range is managed by the opposite side. @test1171706
                     # 0_0 opposite_side = Direction.get_opposite(inode.dimension.direction)
                     opposite_side = Direction.get_opposite(inode.direction)
                     left |= (opposite_side == Direction.LEFT)
