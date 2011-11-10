@@ -3,6 +3,7 @@ import copy
 import logging
 import math
 import random
+import avl  # see sourceforge.net/project/pyavl 
 
 # ResumeNet imports
 from util import Direction
@@ -141,8 +142,16 @@ class Range(object):
 class Dimension(object):
     """This class represents a dimension in the space."""
 
+    all_dims = dict()
+
     def __init__(self, dimension):
         self.__dimension = dimension
+
+    @staticmethod
+    def get(name):
+        if not name in Dimension.all_dims:
+            Dimension.all_dims[name]=Dimension(name)
+        return Dimension.all_dims[name]
 
     @property
     def dimension(self):
@@ -418,7 +427,8 @@ class CompCounter(object):
 
         self.__nb_value = 0
         self.__virtual = list()         # [ (space_part, data)? ]
-        self.__constrained = list()     # [ [value, nb_before_value, [ (space_part, data)? ] ]? ]
+        # the items in the AVL are lists with [value, nb_before_value, [ (space_part, data)? ] ]?
+        self.__constrained = avl.new(compare=CompCounter.__comparator )     
 
         self.__changed = True
 
@@ -428,6 +438,16 @@ class CompCounter(object):
 
     #
     # Properties
+    @staticmethod
+    def __comparator(x,y):
+        if (x[0]<y[0]):
+            return -1
+        if (x[0]==y[0]):
+            return 0
+        return 1
+    
+    
+
 
     @property
     def dimension(self):
@@ -492,43 +512,36 @@ class CompCounter(object):
 
     def add(self, p_comp, p_data):
         """Add a component in this CompCounter."""
+        ## TODO : consider a balanced, binary tree to support both
+        ##   efficient insertion and sorted values.
+        ## NOTE: we look for the MEDIAN value of dimension D for
+        ##   the dataset, so binary tree's root might *not* 
         self.__changed = True
         self.__nb_value += 1
 
         if(p_comp != None and not p_comp.virtual):
             # The component is correctly defined: could be added.            
-            self.__constrained.sort(key=lambda m_list: m_list[0])   #Precondition
+            # self.__constrained.sort(key=lambda m_list: m_list[0])   #Precondition
 
             i = 0
             added = False
+            # invariant: C[i].left_sided = sum[0..i[ (sizeof(C[j].data))
 
-            while i < len(self.__constrained):
-                comp, left_sided, datas = self.__constrained[i]
-
-                if(not added):
-                    if(p_comp < comp):
-                        # insert make a shift of the value standing after the inserting point.
-                        self.__constrained.insert(i, [p_comp, 1, [p_data]])
-                        added = True
-
-                    elif(p_comp == comp):
-                        datas.append(p_data)
-                        self.__constrained[i] = [comp, left_sided + 1, datas]
-                        added = True
-
-                else:
-                    # Every element after an add must also be increased.
-                    self.__constrained[i] = [comp, left_sided + 1, datas]
-                i = i + 1
-
-            if(not added):
-                # The p_comp is the highest value ever seen.
-                self.__constrained.append([p_comp, self.nb_constrained, [p_data]])
+            if self.__constrained.has_key([p_comp]):
+                existing = self.__constrained.lookup([p_comp])
+                self.__constrained.remove([p_comp])
+                existing[1]+=1
+                existing[2].append(p_data)
+                self.__constrained.insert(existing)
+            else:
+                self.__constrained.insert([p_comp,1,[p_data]])
 
         else:
             # The component is virtual: should be process differently.
             self.__virtual.append(p_data)
 
+    def __repr__(self):
+        return "<CompCounter: "+str(self.__dimension)+" "+str(self.size)+" values>"
 
     def __compute_best_partition_value(self):
         """Return the best partition value."""
@@ -536,20 +549,32 @@ class CompCounter(object):
             raise ValueError()
 
         if(self.__changed):
+            print("re-computing partition for "+str(self))
             nb_cut_left, nb_cut_right = 0, 0
 
             # Sort on the nearest "50% ratio" cut. Nearest ratio is the first.
-            self.__constrained.sort(key=lambda m_list: CompCounter.__half_ratio_distance(m_list[1], self.nb_constrained))
-
+            ##  btw, 'sorted' list is not that useful. What we need is
+            ##  X : min __half_ration_distance(left_sided,N) ==>  TODO.
+            #self.__constrained.sort(key=lambda m_list: CompCounter.__half_ratio_distance(m_list[1], self.nb_constrained))
+            best = None
+            bestratio=2
+            num=0
+            for x in self.__constrained:
+                num+=x[1]
+                r = CompCounter.__half_ratio_distance(num, self.nb_constrained)
+                if r < bestratio:
+                    bestratio=r
+                    best=x
+            
             # [bound_value of the best bound, the number of left elements if that bound is chosen, x]
-            [self.__cut_value, nb_cut_left, unused] = self.__constrained[0]
+            [self.__cut_value, nb_cut_left, unused] = best
             nb_cut_right = (self.size - self.nb_virtual) - nb_cut_left
 
             nb_virtual_left, nb_virtual_right = self.__compute_virtual_distribution(self.nb_virtual, nb_cut_left, nb_cut_right)
             self.__separate_data(nb_virtual_left, nb_virtual_right)
 
             # Reset the state of distribution.
-            self.__constrained.sort(key=lambda m_list: m_list[0])
+            # self.__constrained.sort(key=lambda m_list: m_list[0])
             self.__changed = False
 
         return self.__cut_value
@@ -623,7 +648,7 @@ class CompCounter(object):
         print("CompCounter")
         print(" Dim   :", self.__dimension)
         print(" All   :", self.__constrained)
-        print(" Virt  :", self.__data_to_string(self.__virtual))
+        print(" Virt  :", len(self.__virtual)," values")   #self.__data_to_string(self.__virtual))
         print(" Split :", self.best_bound_value)
         print(" Ratio :", self.ratio_diff_between_side)
         print(" Left  :", self.__data_to_string(self.__data_left))

@@ -279,6 +279,7 @@ class Node(object):
         state['_Node__send'] = None
         state['_Node__neighbourhood'] = None
         state['_Node__status_up'] = None
+        state['_Node__data_store'] = None
 
         return state
 

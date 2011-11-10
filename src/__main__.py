@@ -15,6 +15,8 @@ from node import NetNodeInfo, Node
 from nodeid import NumericID, NameID
 from equation import SpacePart, Component, Dimension
 
+import cProfile
+
 
 # ------------------------------------------------------------------------------------------------
 
@@ -65,7 +67,6 @@ class ThreadListener(threading.Thread):
         except:
             LOGGER.log(logging.ERROR, "The listener coudn't be started.")
 
-
 class ThreadTalker(threading.Thread):
 
     def __init__(self, local_node):
@@ -84,7 +85,16 @@ class ThreadTalker(threading.Thread):
         self.__menu.append(("Dump data store", self.__dump_store))
 
     def run(self):
-        time.sleep(0.5)
+        profiler= cProfile.Profile()
+        profiler.enable()
+        try:
+            self.profiled()
+        finally:
+            profiler.disable()
+            profiler.print_stats("time") # ('myprofile-%d.profile' % (self.ident,))
+
+    def profiled(self):
+#        time.sleep(0.5)
         while True:
             self.__get_action(self.__menu)
 
@@ -97,7 +107,10 @@ class ThreadTalker(threading.Thread):
                     print("\r\nWhich action do you want to do ?")
                     for i in range(len(actions)):
                         print("  ", i, ". ", actions[i][0], sep="")
-                choice = int(input())
+                inp=input()
+                if (inp == 'q'):
+                    sys.exit(0)
+                choice = int(inp)
                 if(0 <= choice and choice < len(actions)):
                     index_action = choice
                     break
