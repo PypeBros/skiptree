@@ -84,6 +84,9 @@ class ThreadTalker(threading.Thread):
         self.__menu.append(("Send data to the skiptree.", self.__send_data))
         self.__menu.append(("Dump data store", self.__dump_store))
 
+        self.uid=0
+        self.portno=self.__local_node.net_info.get_port()
+
     def run(self):
         profiler= cProfile.Profile()
         profiler.enable()
@@ -162,9 +165,10 @@ class ThreadTalker(threading.Thread):
         keypart = eval(input())
         # "SpacePart([Component(Dimension('ip'),'127.0.0.1'), Component(Dimension('timestamp'),'13:37')])")
         
-        # XXX set_component does not properly check the key is a Dimension.
-        keypart.set_component(Component(Dimension('portno'),'80'))
-        purevalues = [1234,5678,9999];
+#         # XXX set_component does not properly check the key is a Dimension.
+#         keypart.set_component(Component(Dimension('portno'),'80'))
+        purevalues = [self.portno,self.uid]
+        self.uid+=1
         self.__local_node.data_store.add(keypart, purevalues)
 #        pass
 

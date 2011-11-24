@@ -2,17 +2,16 @@
 
 # tested with Python 2.4, september-2007 (1.12)
 # tested with Python 2.5, december-2008 (1.12_1)
-# testing with Python 3, november 2011
 
 import sys
 import unittest
 import random
 import string
 import itertools
-#import StringIO
-#import cStringIO
+import StringIO
+import cStringIO
 import pickle
-#import cPickle
+import cPickle
 import avl
 
 def verify_empty(tree):
@@ -22,19 +21,19 @@ def verify_len(tree, size):
 	return tree.verify()==1 and len(tree)==size
 
 def gen_ints(lo, hi):
-	for i in range(lo, hi):
+	for i in xrange(lo, hi):
 		yield i
 
 # call with gcd(step,modulo)=1
 def gen_ints_perm(step, modulo):
 	n = random.randint(0, modulo-1)
-	for i in range(modulo):
+	for i in xrange(modulo):
 		val = n
 		n = (val+step) % modulo
 		yield val
 	
 def gen_pairs(lo, hi):
-	for i in range(lo, hi):
+	for i in xrange(lo, hi):
 		yield (i, 0)
 
 def	gen_iter(a, b):
@@ -62,9 +61,7 @@ def fill_tree(tree, some_iter):
 	for o in some_iter: t.insert(o)
 	
 # return 1 if tree1 and tree2 hold the same set of keys
-def equal_tree(tree1, tree2, compare=None):
-	if compare==None:
-		compare=cmp
+def equal_tree(tree1, tree2, compare=cmp):
 	if len(tree1) != len(tree2):
 		return 0
 	i1 = iter(tree1)
@@ -88,7 +85,7 @@ class Test_avl_ins(unittest.TestCase):
 	
 	def setUp(self):
 		self.size = 1000
-		self.list = list(range(self.size))
+		self.list = range(self.size)
 		self._times = 7
 	
 	# test avl.new
@@ -163,7 +160,7 @@ class Test_avl_ins(unittest.TestCase):
 	
 	# test ins and clear
 	def testins_big(self):
-		print('please wait ...')
+		print 'please wait ...'
 		big_size = 20000
 		for i in range(self._times):
 			t = random_int_tree(-big_size, big_size, big_size)
@@ -182,7 +179,7 @@ class Test_avl_lookup(unittest.TestCase):
 	def setUp(self):
 		self.n = 5000
 		self.t = range_tree(0, self.n)
-		self.bad = list(range(-500, 0)) + list(range(self.n, self.n+500))
+		self.bad = range(-500, 0) + range(self.n, self.n+500)
 		
 	def testlookup_get(self):
 		for i in self.bad:
@@ -223,7 +220,7 @@ class Test_avl_iter(unittest.TestCase):
 	def setUp(self):
 		self.n = 1000
 		self.t = range_tree(0, self.n)
-		self.orig = list(range(self.n))
+		self.orig = range(self.n)
 	
 	def testiter_forloop(self):
 		list = self.orig[:]
@@ -272,7 +269,7 @@ class Test_avl_iter(unittest.TestCase):
 		self.assert_(k.next() == 'cc')
 	
 	def testiter_remove(self):
-		print('please wait ...')
+		print 'please wait ...'
 		for start in range(1, self.n+1):
 			u = avl.new(self.t)
 			self.assert_(u.verify() == 1)
@@ -344,7 +341,7 @@ class Test_avl_del(unittest.TestCase):
 		self.assert_(t.verify() == 1)
 		n = len(t)
 		# no-op
-		others = list(range(-2100, -2000)) + (range(2000,2100))
+		others = range(-2100, -2000) + range(2000,2100)
 		random.shuffle(others)
 		for i in others: t.remove(i)
 		self.assert_(verify_len(t, n))
@@ -388,7 +385,7 @@ class Test_avl_del(unittest.TestCase):
 			self.failIf(t.has_key(j))
 	
 	def testdel_one(self):
-		print('please wait ...')
+		print 'please wait ...'
 		n = 4000
 		t = random_int_tree(0, n, n)
 		for i in gen_ints_perm(1993, n):
@@ -481,9 +478,9 @@ class Test_avl_sequence(unittest.TestCase):
 		self.assertRaises(IndexError, t.remove_at, 0)
 		
 	def testseq_spaninsert(self):
-		print('please wait ...')
+		print 'please wait ...'
 		n =	5000
-		t = avl.new(compare=lambda x,y : cmp(y,x))
+		t = avl.new(compare=lambda x,y:cmp(y,x))
 		for i in range(2):
 			for	i in gen_ints(0, 3*n):
 				e = random.randint(-n,n)
@@ -506,20 +503,20 @@ class Test_avl_sequence(unittest.TestCase):
 			self.assert_(b-a == repeats)
 			self.assert_(a==0 or t[a-1] < k)
 			self.assert_(b==len(t) or t[b] > k)
-			for i in range(repeats): t.remove_at(a)
+			for i in xrange(repeats): t.remove_at(a)
 			self.assert_(t.span(k) == (a,a))
 		self.assert_(verify_empty(t))
 	
 	def testseq_slicedup(self):
 		n = 3000
-		for i in range(3):
+		for i in xrange(3):
 			t = random_int_tree(0, n, 4*n)
 			self.assert_(equal_tree(t[:], t))
 	
 	def testseq_sliceempty(self):
 		t = random_int_tree(0, 500, size=1000)
 		lim = len(t)
-		for i in range(100):
+		for i in xrange(100):
 			a = random.randint(0, lim)
 			b = random.randint(0, a)
 			self.assert_(verify_empty(t[a:b]))
@@ -528,10 +525,10 @@ class Test_avl_sequence(unittest.TestCase):
 			self.assert_(verify_empty(t[-b:-a]))
 		
 	def testseq_slice(self):
-		print('please wait ...')
+		print 'please wait ...'
 		n = 1000
 		t = range_tree(0, n)
-		for a in range(n):
+		for a in xrange(n):
 			u = t[:a]
 			self.assert_(verify_len(u, a))
 			self.assert_(equal_tree(u, range_tree(0,a)))
@@ -541,7 +538,7 @@ class Test_avl_sequence(unittest.TestCase):
 		
 	#test a+b
 	def testseq_sliceconcat(self):
-		print('please wait ...')
+		print 'please wait ...'
 		n = 2000
 		e = avl.new()
 		t =	range_tree(0, n)
@@ -591,11 +588,11 @@ class Test_avl_pickling(unittest.TestCase):
 		
 	def testfrom_iter_basic(self):
 		for n in [0, 1, 10, 100, 1000, 10000]:
-			a = range(n)
+			a = xrange(n)
 			self.assertRaises(AttributeError, avl.from_iter, a, len(a)+1)
 			self.assertRaises(StopIteration, avl.from_iter, iter(a), len(a)+1)
 		for n in [0, 1, 10, 100, 1000, 10000, 100000]:
-			a = range(n)
+			a = xrange(n)
 			t = avl.from_iter(iter(a), len(a))
 			self.assert_(verify_len(t, n))
 			for j, k in gen_iter(iter(a), iter(t)):
@@ -663,7 +660,7 @@ def suite():
 	return suite
 
 def main():
-	print(sys.version)
+	print sys.version
 	random.seed()
 	unittest.TextTestRunner(verbosity=2).run(suite())
 	

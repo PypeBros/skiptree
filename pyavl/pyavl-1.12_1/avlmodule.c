@@ -5,10 +5,22 @@
  * avl routines are in "avl.c"
  */
 
-#include <stdio.h>  // debug
-
 #include "Python.h"
 #include "avl.h"
+
+#ifdef MPW_C
+#undef staticforward
+#undef statichere
+
+/* [Classic MacOS] The following is no longer in Include/object.h as of Python 2.3 */
+#ifdef BAD_STATIC_FORWARD
+#define staticforward extern
+#define statichere static
+#else
+#define staticforward static
+#define statichere static
+#endif							/* !BAD_STATIC_FORWARD */
+#endif							/*MPW_C */
 
 #undef DOCUMENTATION
 
@@ -31,7 +43,7 @@ typedef struct {
 	avl_code_t compare_err;
 } avl_tree_Object;
 
-PyTypeObject avl_tree_Type;
+staticforward PyTypeObject avl_tree_Type;
 
 #define is_avl_tree_Object(v)	((v)->ob_type == &avl_tree_Type)
 
@@ -43,23 +55,17 @@ typedef struct {
 	avl_tree_Object *tree_object;	/* keep a new reference to tree that is iterated over */
 } avl_iter_Object;
 
-PyTypeObject avl_iter_Type;
+staticforward PyTypeObject avl_iter_Type;
 
 Py_LOCAL(int)
 _item_compare_default(avl_tree_Object * compare_arg, const void *lhs,
 					  const void *rhs)
 {
-  /** used as t->compare within the 'internal' avl_tree object.
-   **  c = compare(item_to_find, node.item)
-   **  right subtree is looked up when c>0 and left subtree when 
-   **  c<0
-   **/
-  int lt,eq;
-  eq = PyObject_RichCompareBool(objectAt(lhs), objectAt(rhs),Py_EQ);
-  lt = PyObject_RichCompareBool(objectAt(lhs), objectAt(rhs),Py_LT);
-  compare_arg->compare_err = (PyErr_Occurred() != NULL);
+	int rv;
 
-  return lt?-1:(eq?0:1);
+	rv = PyObject_Compare(objectAt(lhs), objectAt(rhs));
+	compare_arg->compare_err = (PyErr_Occurred() != NULL);
+	return rv;
 }
 
 Py_LOCAL(int)
@@ -81,7 +87,7 @@ Py_LOCAL(int)
 		if (pyres == NULL)
 			compare_arg->compare_err = 1;
 		else {
-			rv = PyLong_AsLong(pyres);
+			rv = PyInt_AsLong(pyres);
 			Py_DECREF(pyres);
 			compare_arg->compare_err = 0;
 		}
@@ -213,7 +219,7 @@ Py_LOCAL(PyObject *) avl_tree_has_key(avl_tree_Object * self,
 
 	if (res == NULL && self->compare_err)
 		return NULL;
-	return PyLong_FromLong(res == NULL ? 0 : 1);
+	return PyInt_FromLong(res == NULL ? 0 : 1);
 }
 
 PyDoc_STRVAR(avl_tree_ins__doc__,
@@ -235,8 +241,8 @@ Py_LOCAL(PyObject *) avl_tree_ins(avl_tree_Object * self, PyObject * args)
 		/* compare failed and insertion was prevented */
 		if (rv == -2)
 			return NULL;
-	} else if (PyLong_Check(arg2) || PyLong_Check(arg2)) {
-		long idx = PyLong_AsLong(arg2);	/*PyLong_AsUnsignedLongMask(arg2) */
+	} else if (PyInt_Check(arg2) || PyLong_Check(arg2)) {
+		long idx = PyInt_AsLong(arg2);	/*PyInt_AsUnsignedLongMask(arg2) */
 		avl_size_t rank;
 
 		if (idx < 0)
@@ -321,7 +327,7 @@ Py_LOCAL(PyObject *) avl_tree_index(avl_tree_Object * self,
 	idx = avl_index((const void *) val, self->tree);
 	if (idx == 0 && self->compare_err)
 		return NULL;
-	return PyLong_FromLong((long) idx - 1);
+	return PyInt_FromLong((long) idx - 1);
 }
 
 PyDoc_STRVAR(avl_tree_rem_index__doc__,
@@ -533,7 +539,7 @@ Py_LOCAL(PyObject *) avl_tree_verify(avl_tree_Object * self,
 	rc = (avl_verify(self->tree) == avl_true ? 1 : 0);
 	if (self->compare_err)
 		return NULL;
-	return PyLong_FromLong(rc);
+	return PyInt_FromLong(rc);
 }
 #endif							/* HAVE_AVL_VERIFY */
 
@@ -607,7 +613,7 @@ Py_LOCAL(PyObject *) avl_tree_pickle_dump(avl_tree_Object * self,
 		}
 		/* dump the objects count */
 		rv = PyObject_CallFunction(dump_method, "O",
-					   PyLong_FromLong(avl_size(self->tree)));
+								   PyInt_FromLong(avl_size(self->tree)));
 		if (rv == NULL);
 		else
 			rv = PyObject_CallFunction(dump_method, "O",
@@ -707,29 +713,27 @@ Py_LOCAL(void) avl_tree_dealloc(avl_tree_Object * self)
 	PyObject_DEL(self);
 }
 
-/* 
-   Py_LOCAL(PyObject *) avl_tree_getattr(avl_tree_Object * self, char *name)
-   {
-   return Py_FindMethod(avl_tree_methods, (PyObject *) self, name);
-   }
-   
-   Py_LOCAL(int)
-   avl_tree_setattr(avl_tree_Object * self, char *name, PyObject * v)
-   {
-   #ifdef DOCUMENTATION
-   if (v == NULL) {
-   int rv = PyDict_DelItemString(self->x_attr, name);
-   
-   if (rv < 0)
-   PyErr_SetString(PyExc_AttributeError,
-   "delete non-existing avl_tree attribute");
-   return rv;
-   }
-   return PyDict_SetItemString(self->x_attr, name, v);
-   #endif							// DOCUMENTATION
-   return -1;
-   }
-*/
+Py_LOCAL(PyObject *) avl_tree_getattr(avl_tree_Object * self, char *name)
+{
+	return Py_FindMethod(avl_tree_methods, (PyObject *) self, name);
+}
+
+Py_LOCAL(int)
+	avl_tree_setattr(avl_tree_Object * self, char *name, PyObject * v)
+{
+#ifdef DOCUMENTATION
+	if (v == NULL) {
+		int rv = PyDict_DelItemString(self->x_attr, name);
+
+		if (rv < 0)
+			PyErr_SetString(PyExc_AttributeError,
+							"delete non-existing avl_tree attribute");
+		return rv;
+	}
+	return PyDict_SetItemString(self->x_attr, name, v);
+#endif							/* DOCUMENTATION */
+	return -1;
+}
 
 /* 
    Sourceforge user Nathan Hurst (njh) wrote on the SF tracker about repr() being very slow:
@@ -759,10 +763,10 @@ Py_LOCAL(PyObject *) avl_tree_repr(avl_tree_Object * self)
 
 	rc = Py_ReprEnter((PyObject *) self);
 	if (rc != 0)
-	  return rc > 0 ? PyUnicode_FromString("[...]") : NULL;
+		return rc > 0 ? PyString_FromString("[...]") : NULL;
 
 	if (len == 0) {
-		result = PyUnicode_FromString("[]");
+		result = PyString_FromString("[]");
 		goto finish;
 	}
 
@@ -1045,7 +1049,7 @@ Py_LOCAL(PyObject *) avl_iter_cur(avl_iter_Object * iter_obj,
 Py_LOCAL(PyObject *) avl_iter_index(avl_iter_Object * iter_obj,
 									PyObject * unused)
 {
-	return PyLong_FromLong((long) avl_iterator_index(iter_obj->iter) - 1);
+	return PyInt_FromLong((long) avl_iterator_index(iter_obj->iter) - 1);
 }
 
 Py_LOCAL(PyObject *) avl_iter_rem(avl_iter_Object * iter_object,
@@ -1073,7 +1077,6 @@ Py_LOCAL(PyObject *) avl_iter_rem(avl_iter_Object * iter_object,
  *  - set at position
  */
 static struct PyMethodDef avl_iter_methods[] = {
-	{"next", (PyCFunction) avl_iter_next, METH_NOARGS, (char *) NULL},
 	{"prev", (PyCFunction) avl_iter_prev, METH_NOARGS, (char *) NULL},
 	{"cur", (PyCFunction) avl_iter_cur, METH_NOARGS, (char *) NULL},
 	{"index", (PyCFunction) avl_iter_index, METH_NOARGS, (char *) NULL},
@@ -1102,11 +1105,9 @@ PyDoc_STRVAR(avl_iter_Type__doc__,
 			 "results are undefined. Yet, 'iter.remove()' removes the current item\n"
 			 "and sets 'iter' to the previous position, if there is one.");
 
-PyTypeObject avl_iter_Type = {
-  
-  // PyObject_HEAD_INIT(NULL)	/* ob_size */
-  {},
-  "avl_iterator",				/* tp_name */
+statichere PyTypeObject avl_iter_Type = {
+	PyObject_HEAD_INIT(NULL) 0,	/* ob_size */
+	"avl_iterator",				/* tp_name */
 	sizeof(avl_iter_Object),	/* tp_basicsize */
 	0,							/* tp_item_size */
 	/* methods */
@@ -1122,7 +1123,7 @@ PyTypeObject avl_iter_Type = {
 	0,							/* tp_hash */
 	0,							/* tp_call */
 	0,							/* tp_str */
-	PyObject_GenericGetAttr,					/* tp_getattro */
+	NULL,						/* tp_getattro */
 	0,							/* tp_setattro */
 	0,							/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -1154,18 +1155,18 @@ PyDoc_STRVAR(avl_tree_Type__doc__,
 			 "A dual-personality object, which can act like a sequence and an ordered container.\n"
 			 "AVL tree-based iterative implementation, storing RANK and parent pointers.");
 
-PyTypeObject avl_tree_Type = {
+statichere PyTypeObject avl_tree_Type = {
 	/* The ob_type field must be initialized in the module init function
 	 * to be portable to Windows without using C++ */
-  {},//PyObject_HEAD_INIT(NULL) 0,	/*ob_size */
+	PyObject_HEAD_INIT(NULL) 0,	/*ob_size */
 	"avl_tree",					/*tp_name */
 	sizeof(avl_tree_Object),	/*tp_basicsize */
 	0,							/*tp_item_size */
 	/* methods */
 	(destructor) avl_tree_dealloc,	/*tp_dealloc */
 	(printfunc) 0,				/*tp_print */
-	(getattrfunc) 0, //avl_tree_getattr,	/*tp_getattr */
-  (setattrfunc) 0, //avl_tree_setattr,	/*tp_setattr */
+	(getattrfunc) avl_tree_getattr,	/*tp_getattr */
+	(setattrfunc) avl_tree_setattr,	/*tp_setattr */
 	0,							/*tp_compare */
 	(reprfunc) avl_tree_repr,	/*tp_repr */
 	0,							/*tp_as_number */
@@ -1174,7 +1175,7 @@ PyTypeObject avl_tree_Type = {
 	0,							/*tp_hash */
 	0,							/*tp_call */
 	0,							/*tp_str */
-        PyObject_GenericGetAttr,				/*tp_getattro */
+	0,							/*tp_getattro */
 	0,							/*tp_setattro */
 	0,							/*tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/*tp_flags */
@@ -1185,7 +1186,7 @@ PyTypeObject avl_tree_Type = {
 	0,							/*tp_weaklistoffset */
 	(getiterfunc) avl_iter_new,	/*tp_iter */
 	(iternextfunc) 0,			/*tp_iternext */
-	avl_tree_methods,					/*tp_methods */
+	0,							/*tp_methods */
 	0,							/*tp_members */
 	0,							/*tp_getset */
 	0,							/*tp_base */
@@ -1348,7 +1349,7 @@ Py_LOCAL(PyObject *) avl_do_load(PyObject * from_object, char *method_name,
 					break;
 			} else
 				Py_INCREF(len_object);
-			len = (avl_size_t) PyLong_AsLong(len_object);	/*PyLong_AsUnsignedLongMask(len_object) */
+			len = (avl_size_t) PyInt_AsLong(len_object);	/*PyInt_AsUnsignedLongMask(len_object) */
 			Py_DECREF(len_object);
 			/* get compare func */
 			if (NULL == compare_func) {
@@ -1437,7 +1438,7 @@ Py_LOCAL(PyObject *) avl_from_iter(PyObject * unused, PyObject * args,
 		 &compare_func))
 		return NULL;
 #if 0==0
-	if (len_object != NULL && !PyLong_Check(len_object)
+	if (len_object != NULL && !PyInt_Check(len_object)
 		&& !PyLong_Check(len_object)) {
 		PyErr_SetString(PyExc_TypeError,
 						"argument 'len' (position 2) must be of type 'int' or 'long'");
@@ -1470,41 +1471,24 @@ PyDoc_STRVAR(avl_module_doc,
 
 /* Initialization function for the module (*must* be called initavl) */
 
-static struct PyModuleDef moduledef = {
-  PyModuleDef_HEAD_INIT,
-  "avl",
-  avl_module_doc,
-  -1,
-  avl_methods,
-  NULL, // m_reload
-  NULL, // m_traverse
-  NULL, // m_clear
-  NULL, // m_free
-};
-
-PyMODINIT_FUNC PyInit_avl(void)
+void initavl(void)
 {
 	PyObject *m, *d;
 
-	fprintf(stderr,"initializing PYAVL...\n");
 	avl_default_conf.alloc = PyMem_Malloc;
 	avl_default_conf.dealloc = PyMem_Free;
 
 	/* Initialize the type of the new type object here; doing it here
 	 * is required for portability to Windows without requiring C++. */
-	avl_tree_Type.ob_base.ob_base.ob_type = &PyType_Type;
-	avl_iter_Type.ob_base.ob_base.ob_type = &PyType_Type;
+	avl_tree_Type.ob_type = &PyType_Type;
+	avl_iter_Type.ob_type = &PyType_Type;
 	avl_iter_Type.tp_getattro = PyObject_GenericGetAttr;
 
 	/* Create the module and add the functions */
-	//	m = Py_InitModule3("avl", avl_methods, avl_module_doc);
-	m = PyModule_Create(&moduledef);
+	m = Py_InitModule3("avl", avl_methods, avl_module_doc);
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
 	avlErrorObject = PyErr_NewException("avl.Error", NULL, NULL);
 	PyDict_SetItemString(d, "Error", avlErrorObject);
-	fprintf(stderr,"initialization done.\n");
-	
-	return m;
 }

@@ -771,7 +771,7 @@ class InternalNode(Component):
 
     # cannonical name for "toString" in python.
     def __repr__(self):
-        return "(node "+Component.__repr__(self)+" "+str(self.__direction)+")"
+        return "(node "+Component.__repr__(self)+" "+('<' if self.__direction else '>')+")"
     
 
 class CPEError(Exception):
