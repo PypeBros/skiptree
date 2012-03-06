@@ -22,7 +22,7 @@ from routing import RouterReflect
 from nodeid import NodeID, PartitionID
 from util import Direction
 
-# ------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 # Module log abilities
 LOG_HANDLER = logging.StreamHandler()
@@ -32,7 +32,7 @@ LOGGER = logging.getLogger("localevent")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
-# ------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 class MessageDispatcher(object):
     """Dispatch messages through components of the application."""
@@ -69,7 +69,7 @@ class MessageDispatcher(object):
                         self.__local_node.sender.send_msg(message, next_hop)
                 else:
                     assert False , "Next hop == None"
-
+            sys.stdout.flush()
 #             except:
 #                 # http://docs.python.org/library/sys.html#sys.exc_info
 #                 print("There is an error in the message dispatcher: ", sys.exc_info()[0], sys.exc_info())
@@ -247,15 +247,21 @@ class ProcessorVisitor(VisitorMessage):
 
     def visit_SNJoinRequest(self, message):
         self.__join_processor.visit_SNJoinRequest(message)
+        print("0_0 Welcome on SkipNet",message)
 
     def visit_SNJoinReply(self, message):
         self.__join_processor.visit_SNJoinReply(message)
+        print("0_0 Joint the SkipNet",message)
 
     def visit_STJoinRequest(self, message):
         self.__join_processor.visit_STJoinRequest(message)
+        print("0_0 Welcome on SkipTree",message)
 
     def visit_STJoinReply(self, message):
         self.__join_processor.visit_STJoinReply(message)
+        print("0_0 Joint the SkipTree",message)
+        if (message.phase == STJoinRequest.STATE_ACCEPT):
+            print("#_# CONNECTED")
 
     def visit_STJoinError(self, message):
         self.__join_processor.visit_STJoinError(message)
@@ -326,10 +332,13 @@ class JoinProcessor(VisitorMessage):
 
     def set_busy(self, value):
         """Set the state of the JoinProcessor."""
+
+
         self.__join_busy = value
 
     def visit_STJoinRequest(self, message):
-        print("visit_STJoinRequest")
+        # runs in the welcoming node, upon Join Request message.
+        print("0_0 visit_STJoinRequest, phase=",str(message.phase))
 
         if(message.phase == STJoinRequest.STATE_ASK):
             # A new node would like to join the network.
@@ -337,14 +346,14 @@ class JoinProcessor(VisitorMessage):
             if(self.is_busy()):
                 # The local node is already busy with another joining node.
                 join_error = STJoinError(message, "Contacted node already busy with a join activity")
-
+                self.__local_node.sign("sending error message "+join_error)
                 route_msg = RouteDirect(join_error, message.joining_node)
                 self.__local_node.route_internal(route_msg)
 
             else:
                 # Compute a proposition for the joining node and sent it.
                 self.set_busy(True)
-
+                self.__local_node.status="welcoming %s" % repr(message.joining_node.name_id);
                 join_partition_id = self.compute_partition_id(message)
                 join_cpe, join_data, self.__new_local_cpe, self.__new_local_data = self.compute_cpe_and_data(message)
 
@@ -352,47 +361,53 @@ class JoinProcessor(VisitorMessage):
                 self.__join_msg.partition_id = join_partition_id
                 self.__join_msg.cpe = join_cpe
                 self.__join_msg.data = join_data
-
+                
                 route_msg = RouteDirect(self.__join_msg, message.joining_node)
+                self.__local_node.sign("sending joinreply (ask phase)")
                 self.__local_node.route_internal(route_msg)
 
         elif(message.phase == STJoinRequest.STATE_ACCEPT):
-            # Update the local node data.
+            self.__local_node.sign("Update the local node data");
             self.__local_node.cpe = self.__new_local_cpe
             self.__local_node.data_store = DataStore(self.__new_local_data)
 
+            print("0_0 Data Split accepted");
             local_node_status = self.__local_node.status_updater
-            local_node_status.update_status_now()
 
+            self.__local_node.sign("'repairing' the neighbourhood table")
+            local_node_status.update_status_now()
             self.set_busy(False)
+            print("#_# Join process completed.");
 
             self.__join_msg = STJoinReply(self.__local_node, STJoinReply.STATE_CONFIRM)
-
             route_msg = RouteDirect(self.__join_msg, message.joining_node)
+            self.__local_node.sign("sending confirmation message")
             self.__local_node.route_internal(route_msg)
 
         else:
             join_error = STJoinError(message, "Unrecognized join request.")
-
+            self.__local_node.sign("sending error message "+join_error)
             route_msg = RouteDirect(join_error, message.joining_node)
             self.__local_node.route_internal(route_msg)
 
 
     def visit_STJoinReply(self, message):
-        print("visit_STJoinReply")
+        ## running on the newborn node, if the welcoming node can welcome us.
+        print("0_0 visit_STJoinReply, phase=",str(message.phase))
 
         if(message.phase == STJoinReply.STATE_PROPOSE):
-
+            self.__local_node.sign("join proposition received "+str(message.contact_node))
             if(self.is_busy()):
                 # The local node is already busy with another joining node.
                 join_error = STJoinError(message, "Contacted node already busy with a join activity")
-
+                self.__local_node.sign("joining and busy!?")
                 route_msg = RouteDirect(join_error, message.joining_node)
                 self.__local_node.route_internal(route_msg)
 
             else:
                 self.set_busy(True)
-
+                print("0_0 adding data in the local store ...")
+                self.__local_node.sign("inserting into local store")
                 # Set data received from contact node.
                 self.__local_node.partition_id = message.partition_id
                 self.__local_node.cpe = message.cpe
@@ -400,11 +415,14 @@ class JoinProcessor(VisitorMessage):
                     self.__local_node.data_store.add(data[0],data[1])
                 # Send a reply to the contact node.
                 self.__join_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ACCEPT)
+                self.__local_node.sign("accepting proposition")
                 route_msg = RouteDirect(self.__join_msg, message.contact_node)
                 self.__local_node.route_internal(route_msg)
 
         elif(message.phase == STJoinReply.STATE_CONFIRM):
             self.set_busy(False)
+            print("0_0 connected, hopefully.")
+            self.__local_node.status("connected through "+str(message.contact_node))
 
         else:
             join_error = STJoinError(message, "Unrecognized join request.")
@@ -417,7 +435,7 @@ class JoinProcessor(VisitorMessage):
         raise JoinException(message.reason)
 
     def compute_partition_id(self, message):
-        """Compute a "Partition ID" for the joining node."""
+        self.__local_node.sign("computing partition for joining node")
         new_side_join = Router.by_name_get_direction(self.__local_node.name_id, message.joining_node.name_id)
         next_neighbour = self.__local_node.neighbourhood.get_neighbour(new_side_join, 0)
 
@@ -517,9 +535,11 @@ class JoinProcessor(VisitorMessage):
         contact_node = node_left
         if(prefix_size_left < prefix_size_right):
             contact_node = node_right
-
+        self.__local_node.sign("joint the skipnet")
+        
         # Launch the SkipTree joining.
         payload_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
+        print("0_0 joining the skiptree ",payload_msg)
         route_msg = RouteDirect(payload_msg, contact_node)
         self.__local_node.route_internal(route_msg)
 

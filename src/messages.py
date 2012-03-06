@@ -411,8 +411,7 @@ class SNPingRequest(CtrlMessage):
 
 
 class SNFixupHigher(RouteByPayload, CtrlMessage):
-    """SNFixupHigher is used by a node to obtain some of his neighbours in a higher level.
-    
+    """SNFixupHigher is used by a node to obtain some of his neighbours in a higher level.    
     This message returns the neighbours of the left (right) nearest node's neighbour in a ring. 
     Theses neighbours could be used to build the neighbours of the node in the higher level. This 
     message take a big role in the "Joining part" and the update part of the network.   
@@ -601,7 +600,7 @@ def STJoinError(CtrlMessage):
 
     def __init__(self, original_message=None, reason=""):
         CtrlMessage.__init__(self)
-
+        print("0_0 ERROR: ",original_message);
         self.__reason = None
         self.__original_message = original_message
 

@@ -3,6 +3,7 @@ import copy
 import socket
 import time
 import threading
+import logging
 
 # ResumeNet imports
 from equation import CPE
@@ -15,6 +16,15 @@ from messages import EncapsulatedMessage
 from nodeid import NumericID, PartitionID
 from network import OutRequestManager
 from neighbourhood import Neighbourhood
+
+# Module log abilities
+LOG_HANDLER = logging.StreamHandler()
+LOG_HANDLER.setLevel(logging.DEBUG)
+
+LOGGER = logging.getLogger("localevent")
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(LOG_HANDLER)
+
 
 # ------------------------------------------------------------------------------------------------
 
@@ -105,10 +115,23 @@ class Node(object):
         # Launch the heart beats. 
         self.__status_up = NodeStatusPublisher(self)    #Status updater
         self.__status_up.daemon = True
+        self.__running_op=["Bootstrap"]
+        self.__major_state="Boot"
         #self.__status_up.start()
 
     #
     # Properties
+    @property
+    def status(self):
+        return str(self.__numeric_id) + "("+self.__major_state+"): "+str(self.__running_op)
+
+    @status.setter
+    def status(self, st):
+        self.__major_state=st
+        self.__running_op=[st];
+
+    def sign(self, st):
+        self.__running_op.append(st+"; ")
 
     @property
     def dispatcher(self):
@@ -127,7 +150,7 @@ class Node(object):
     def numeric_id(self):
         """Return the "Numeric identifier" of the Node."""
         return self.__numeric_id
-
+    
     @property
     def partition_id(self):
         """Return the "Partition identifier" of the Node."""
@@ -199,11 +222,13 @@ class Node(object):
         # An encapsulation message is needed because the current don't have any links with node.
         payload_final = EncapsulatedMessage(route_int)
         route_msg = RouteDirect(payload_final, contact_node)
+        self.__major_state="Joining"
         self.route_internal(route_msg)
 
     def leave(self):
         """Start leaving the SkipTree overlay."""
         #TODO: move the SkipTree data to the remaining node before leaving.
+        self.__major_state="Leaving"
         self.__leave_skiptree()
 
     def __leave_skiptree(self):
@@ -315,12 +340,14 @@ class NodeStatusPublisher(threading.Thread):
     def update_status_now(self):
         """Warm neighbours for a new local status."""
         self.__update_status()
+        print("0_0 status update completed");
 
     def __update_status(self):
         """Ping current neighbours and repair locals rings."""
         neighbourhood = self.__local_node.neighbourhood
         nb_ring_level = neighbourhood.get_nb_ring()
 
+        print("0_0 updating rings: ",nb_ring_level);
         for ring_level in range(nb_ring_level):
             # Say that the node is still in life.
             ring = neighbourhood.get_ring(ring_level)

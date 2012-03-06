@@ -18,7 +18,7 @@ from equation import SpacePart, Component, Dimension
 import cProfile
 
 
-# ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 # Module log abilities
 LOG_HANDLER = logging.StreamHandler()
@@ -28,7 +28,7 @@ LOGGER = logging.getLogger("__main__")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
-# ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 class ThreadDispatcher(threading.Thread):
 
@@ -83,10 +83,11 @@ class ThreadTalker(threading.Thread):
         self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
         self.__menu.append(("Send data to the skiptree.", self.__send_data))
         self.__menu.append(("Dump data store", self.__dump_store))
+        self.__menu.append(("Display Current Status",self.__dump_status))
 
         self.uid=0
         self.portno=self.__local_node.net_info.get_port()
-
+        
     def run(self):
         profiler= cProfile.Profile()
         profiler.enable()
@@ -123,9 +124,10 @@ class ThreadTalker(threading.Thread):
                 print("\r\n")
                 self.__interactive=True
         
-#        LOGGER.log(logging.DEBUG, "[ACTION] "+actions[index_action][0])
         actions[index_action][1]()
-#        LOGGER.log(logging.DEBUG, "[ACTION]  completed.")
+
+    def __dump_status(self):
+        sys.stderr.write(self.__local_node.status)
 
     def __dump_store(self):
         self.__local_node.data_store.print_debug()

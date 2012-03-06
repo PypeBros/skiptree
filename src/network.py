@@ -68,7 +68,10 @@ class NetStringTools(object):
     def recv_data(self, data):
         """Call to process a message."""
         self.__buffer = data
-        print("NET> received",len(data),"bytes to process")
+        l = len(data)
+        print("NET> received",l,"bytes to process")
+        if (l==0):
+            raise RuntimeError("connection terminated?",self)
         try:
             while self.__buffer:
                 if self.__reader_state == self.STATE_DATA:
