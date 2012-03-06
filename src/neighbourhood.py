@@ -85,15 +85,15 @@ class Neighbourhood(object):
     # Overwritten
 
     def __repr__(self):
-        repr = "<Neighbourhood--"
+        rpr = "<Neighbourhood--"
         for i in range(len(self.__rings)):
             ring = self.__rings[i]
             if(1 < len(ring.get_all_unique_neighbours())):
-                repr += "|"
-                repr += str(i)
-                repr += ring.__repr__()
-                repr += "|"
-        return repr + ">"
+                rpr += "|"
+                rpr += str(i)
+                rpr += ring.__repr__()
+                rpr += "|"
+        return rpr + ">"
 
 
 class RingSet(object):
@@ -108,7 +108,7 @@ class RingSet(object):
     # Properties
 
     def get_side(self, direction):
-        """"Returns one of the half ring from this ring."""
+        """Returns one of the half ring from this ring."""
         if(direction == Direction.LEFT):
             return self.__left
         elif(direction == Direction.RIGHT):
@@ -209,6 +209,7 @@ class HalfRingSet(object):
     def __try_add_neighbour(self, node_to_add):
         """Try to add a node in the neighbours of this half ring."""
         added = False
+        #  trace = str(self.__neighbours) + "+= "+str(node_to_add)+ "\n"
         if (node_to_add != self.__local_node):
             # Find the position of the new node.
             prev = self.__local_node
@@ -217,7 +218,9 @@ class HalfRingSet(object):
             for i in range(len(self.__neighbours)):
                 current = self.__neighbours[i]
 
-                if (current == node_to_add):
+                if (current.name_id == node_to_add.name_id):
+                    # WARNING: Node.__eq__ not only compares the nameID and numeric_ID,
+                    #  but also partition_id and net_info.
                     # Always take the latest version of node (CPE may change).
                     self.__neighbours[i] = node_to_add
                     return False
@@ -236,6 +239,11 @@ class HalfRingSet(object):
                 if (self.__max_size < len(self.__neighbours) and not self.is_unbounded()):
                     # Remove the farthest neighbour.
                     self.__neighbours.pop()
+
+           #  for i in range(len(self.__neighbours)):
+#                 if (i!=position) :
+#                     assert self.__neighbours[i].name_id != node_to_add.name_id,"node %s already in ringset %s" % (str(node_to_add),str(self.__neighbours))
+                          
 
         return added
 
@@ -270,10 +278,11 @@ class HalfRingSet(object):
         return len(self.__neighbours)
 
     def __repr__(self):
-        repr = ""
+        rpr = str(len(self.__neighbours))+"#"
         for i in range(len(self.__neighbours)):
-            repr += self.__neighbours[i].numeric_id.__repr__()
+            rpr += self.__neighbours[i].name_id.__repr__()
             if (i != len(self.__neighbours) - 1):
-                repr += ", "
-        return repr
+                rpr += ", "
+                # assert (self.__neighbours[i].name_id < self.__neighbours[i+1].name_id),"neighbours ordered."+str(i)+" "+str(self.__neighbours)+"\n"+self.__local_node.status
+        return rpr
 
