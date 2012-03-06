@@ -127,7 +127,7 @@ class ThreadTalker(threading.Thread):
         actions[index_action][1]()
 
     def __dump_status(self):
-        sys.stderr.write(self.__local_node.status)
+        sys.stderr.write(self.__local_node.status+"\n")
 
     def __dump_store(self):
         self.__local_node.data_store.print_debug()

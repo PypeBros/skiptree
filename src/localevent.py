@@ -364,7 +364,10 @@ class JoinProcessor(VisitorMessage):
                 
                 route_msg = RouteDirect(self.__join_msg, message.joining_node)
                 self.__local_node.sign("sending joinreply (ask phase)")
-                self.__local_node.route_internal(route_msg)
+                # this message is likely to be large. [network::]OutRequestManager may have
+                #  a hard time transmitting this.
+                self.__local_node.route_internal(route_msg) 
+                self.__local_node.sign("sent joinreply (ask phase)")
 
         elif(message.phase == STJoinRequest.STATE_ACCEPT):
             self.__local_node.sign("Update the local node data");
@@ -422,7 +425,7 @@ class JoinProcessor(VisitorMessage):
         elif(message.phase == STJoinReply.STATE_CONFIRM):
             self.set_busy(False)
             print("0_0 connected, hopefully.")
-            self.__local_node.status("connected through "+str(message.contact_node))
+            self.__local_node.status="connected through "+str(message.contact_node)
 
         else:
             join_error = STJoinError(message, "Unrecognized join request.")

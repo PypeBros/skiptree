@@ -143,7 +143,8 @@ class NetStringTools(object):
         if self.__reader_length == 0:
             self._data_received(self.__data)
             self.__reader_state = self.STATE_END
-        print("NET> ",str(self.__reader_length)," bytes still pending")
+        else:
+            print("NET> ",str(self.__reader_length)," bytes still pending")
 
     def __do_comma(self):
         """Process the ending of a message looking for the comma delimiter."""
@@ -340,7 +341,7 @@ class OutRequestManager(object):
             # fix1181403
   
             client_socket = self.__get_connection(dst_node)
-            if (len(net_string_msg)>65536):
+            if (len(net_string_msg)>8192):
                 print("NET> large message ahead: turns blocking on")
                 client_socket.setblocking(True)
 
