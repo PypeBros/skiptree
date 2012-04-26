@@ -65,7 +65,7 @@ class ThreadListener(threading.Thread):
         try:
             self.__listener.serve_forever()
         except:
-            LOGGER.log(logging.ERROR, "The listener coudn't be started.")
+            LOGGER.log(logging.ERROR, "The listener coudn't be started for %s." % address)
 
 class ThreadTalker(threading.Thread):
 
@@ -128,6 +128,9 @@ class ThreadTalker(threading.Thread):
 
     def __dump_status(self):
         sys.stderr.write(self.__local_node.status+"\n")
+        sys.stderr.write(self.__local_node.cpe.__repr__())
+        sys.stderr.write("\n%s\n" % self.__local_node.name_id)
+        
 
     def __dump_store(self):
         self.__local_node.data_store.print_debug()
@@ -165,11 +168,7 @@ class ThreadTalker(threading.Thread):
 
     def __add_data(self):
         keypart = eval(input())
-        # "SpacePart([Component(Dimension('ip'),'127.0.0.1'), Component(Dimension('timestamp'),'13:37')])")
-        
-#         # XXX set_component does not properly check the key is a Dimension.
-#         keypart.set_component(Component(Dimension('portno'),'80'))
-        purevalues = [self.portno,self.uid]
+        purevalues = eval(input()% "self.portno,self.uid")
         self.uid+=1
         self.__local_node.data_store.add(keypart, purevalues)
 #        pass
@@ -248,7 +247,8 @@ def main():
         threads = new_threads
 
         if(not all_active):
-            LOGGER.log(logging.WARNING, "All components haven't been started correctly.")
+            LOGGER.log(logging.WARNING, "%s :All components haven't been started correctly."
+                       %local_node.name_id.name)
             break
 
 #     except KeyboardInterrupt:

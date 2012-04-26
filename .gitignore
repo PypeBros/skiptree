@@ -1,0 +1,14 @@
+*.o
+*.Po
+*.pyc
+*.a
+*.so
+*.so.[0-9]*
+omnetpp-4.0/*
+mobitlity-fw2.0p3/*
+*-2009*/*
+cscope.out
+*~
+*.tmp
+.svn/*
+*.cscope

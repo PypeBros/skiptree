@@ -233,6 +233,13 @@ class Node(object):
 
     def __leave_skiptree(self):
         """Send a disconnection message to all SkiptNet neighbours."""
+        # TODO: expected steps are:
+        # - update the partition tree
+        
+        # - transfer data items to appropriated nodes
+
+        
+        # - leave the skipnet.
         neighbours = self.__neighbourhood.get_all_unique_neighbours()
         for neighbour in neighbours:
             if(neighbour != self):

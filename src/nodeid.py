@@ -21,7 +21,7 @@ class NodeID(object):
 
     @staticmethod
     def lies_between(a, b, c):
-        """"Determine if b is located between a and c."""
+        """Determine if b is located between a and c."""
         # Theses cases should return True
         # 1) ***[a---b---c]***
         # 2) ---b---c]***[a--- 
@@ -43,14 +43,16 @@ class NameID(NodeID):
     def name(self):
         return self.__name
 
-    def get_longest_prefix_length(self, name_id):
+    def get_longest_prefix_length(self, alt):
         """Return the length of the longest common prefix."""
-        length, up_bound = 0, min(len(self), len(name_id))
+        length, up_bound = 0, min(len(self), len(alt))
         for i in range(up_bound):
-            if(self.name[i] != name_id.name[i]):
+            if(self.name[i] != alt.name[i]):
                 break
             else:
                 length += 1
+        # tie-breaking useful when 3 names have no common prefix.
+        length+=abs(ord(self.name[i])-ord(alt.name[i]))/1024
         return length
 
     #
@@ -113,7 +115,7 @@ class NumericID(NodeID):
 
 
     def __hash_bytes(self, bytes_seed):
-        """"Get hash from bytes."""
+        """Get hash from bytes."""
         hash_tmp = hashlib.new(self.HASH_ALGO)
         hash_tmp.update(bytes_seed)
         return hash_tmp.digest()
@@ -272,17 +274,17 @@ class PartitionID(NodeID):
 
     @staticmethod
     def gen():
-        """Return a random "Partition ID"."""
+        """Return a random 'Partition ID'."""
         return PartitionID.gen_btw(PartitionID.LOW, PartitionID.UP)
 
     @staticmethod
     def gen_bef(number):
-        """Return a "Partition ID" that stands before 'number'."""
+        """Return a 'Partition ID' that stands before 'number'."""
         return PartitionID.gen_btw(PartitionID.LOW, number)
 
     @staticmethod
     def gen_btw(lower, upper):
-        """Return a "Partition ID" that resides in closed range (Lower, Upper)."""
+        """Return a 'Partition ID' that resides in closed range (Lower, Upper)."""
         partition_id = lower
         while(partition_id == lower or partition_id == upper):
             new_pid = random.uniform(lower, upper)
@@ -293,5 +295,5 @@ class PartitionID(NodeID):
 
     @staticmethod
     def gen_aft(number):
-        """Return a "Partition ID" that stands after 'number'."""
+        """Return a 'Partition ID' that stands after 'number'."""
         return PartitionID.gen_btw(number, PartitionID.UP)

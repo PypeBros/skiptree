@@ -532,11 +532,12 @@ class JoinProcessor(VisitorMessage):
         node_left = self.__local_node.neighbourhood.get_neighbour(Direction.LEFT, 0)
         node_right = self.__local_node.neighbourhood.get_neighbour(Direction.RIGHT, 0)
 
-        prefix_size_left = self.__local_node.name_id.get_longest_prefix_length(node_left.name_id)
-        prefix_size_right = self.__local_node.name_id.get_longest_prefix_length(node_right.name_id)
+        psl = self.__local_node.name_id.get_longest_prefix_length(node_left.name_id)
+        psr = self.__local_node.name_id.get_longest_prefix_length(node_right.name_id)
 
         contact_node = node_left
-        if(prefix_size_left < prefix_size_right):
+        print("0_0 %s@%f -vs- %s@%f"%(node_left, psl, node_right, psr));
+        if(psl < psr):
             contact_node = node_right
         self.__local_node.sign("joint the skipnet")
         
