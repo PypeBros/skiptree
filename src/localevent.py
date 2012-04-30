@@ -18,6 +18,7 @@ from messages import SNJoinRequest, SNJoinReply, SNLeaveReply
 from messages import STJoinReply, STJoinRequest, STJoinError, JoinException
 from messages import IdentityReply
 from messages import NeighbourhoodNet
+from messages import LookupRequest, LookupReply
 from routing import RouterReflect
 from nodeid import NodeID, PartitionID
 from util import Direction
@@ -84,9 +85,22 @@ class DatastoreProcessor(object):
 
     def insertData(self, message):
         """ expect message ISA InsertionRequest """
-        print(message,"has reached",self.__local_node)
+        print(message," has reached ",self.__local_node)
         ### XXX test the message.key matches by local CPEs.
         self.__local_node.data_store.add(message.key, message.data)
+
+    def lookupData(self, message):
+        """ expect message ISA LookupRequest """
+        print(message," has reached ",self.__local_node)
+        values = self.__local_node.data_store.get(message.key)
+        reply = LookupReply(values, message.nonce)
+        route = RouteDirect(reply, message.originator)
+        self.__local_node.route_internal(route)
+
+    def receiveData(self, message):
+        """ expect message ISA LookupReply """
+        values = message.data
+        print("!_! %f - %s" % (message.nonce,repr(values)))
 
 # ------------------------------------------------------------------------------------------------
 
@@ -240,7 +254,12 @@ class ProcessorVisitor(VisitorMessage):
 
     def visit_InsertData(self, message):
         self.__data_processor.insertData(message)
-        
+
+    def visit_LookupData(self, message):
+        self.__data_processor.lookupData(message)
+
+    def visit_LookupReply(self, message):
+        self.__data_processor.receiveData(message)
 
     #
     # Dispatching for the "Join" messages.

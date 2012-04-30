@@ -8,12 +8,12 @@ import threading
 from localevent import MessageDispatcher
 
 from messages import RouteByNumericID, RouteByCPE
-from messages import SNPingRequest, InsertionRequest
+from messages import SNPingRequest, InsertionRequest, LookupRequest
 
 from network import InRequestManager
 from node import NetNodeInfo, Node
 from nodeid import NumericID, NameID
-from equation import SpacePart, Component, Dimension
+from equation import SpacePart, Component, Dimension, Range
 
 import cProfile
 
@@ -32,12 +32,12 @@ LOGGER.addHandler(LOG_HANDLER)
 
 class ThreadDispatcher(threading.Thread):
 
-    def __init__(self, local_node):
+    def __init__(self):
         """Launches the processing part of the Node"""
         threading.Thread.__init__(self)
 
-        self.__dispatcher = MessageDispatcher(local_node)
-        local_node.dispatcher = self.__dispatcher
+        self.__dispatcher = MessageDispatcher(lnode)
+        lnode.dispatcher = self.__dispatcher
 
     #
     # Properties
@@ -69,24 +69,24 @@ class ThreadListener(threading.Thread):
 
 class ThreadTalker(threading.Thread):
 
-    def __init__(self, local_node):
+    def __init__(self):
         """Launches the talking part of the Node"""
         threading.Thread.__init__(self)
         self.__interactive=True
-        self.__local_node = local_node
+#        self.__local_node = local_node
 
         self.__menu = list()
-        self.__menu.append(("Display local node information.", self.__display))
-        self.__menu.append(("Add data to the local node", self.__add_data))
+        self.__menu.append(("Display local node information.", self.__display)) # 0
+        self.__menu.append(("Add data to the local node", self.__add_data))     # 1
         self.__menu.append(("Send a join message (SkipTree).", self.__send_join_skiptree))
-        self.__menu.append(("Send a leave message.", self.__send_leave))
-        self.__menu.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
-        self.__menu.append(("Send data to the skiptree.", self.__send_data))
-        self.__menu.append(("Dump data store", self.__dump_store))
-        self.__menu.append(("Display Current Status",self.__dump_status))
+        self.__menu.append(("Send a leave message.", self.__send_leave))        # 3
+        self.__menu.append(("Send data to the skiptree.", self.__send_data))    # 4
+        self.__menu.append(("check data on the skiptree.", self.__find_data))    # 5
+        self.__menu.append(("Dump data store", self.__dump_store))              # 6
+        self.__menu.append(("Display Current Status",self.__dump_status))       # 7
 
         self.uid=0
-        self.portno=self.__local_node.net_info.get_port()
+        self.portno=lnode.net_info.get_port()
         
     def run(self):
         profiler= cProfile.Profile()
@@ -127,22 +127,33 @@ class ThreadTalker(threading.Thread):
         actions[index_action][1]()
 
     def __dump_status(self):
-        sys.stderr.write(self.__local_node.status+"\n")
-        sys.stderr.write(self.__local_node.cpe.__repr__())
-        sys.stderr.write("\n%s\n" % self.__local_node.name_id)
+        sys.stderr.write(lnode.status+"\n")
+        sys.stderr.write(lnode.cpe.__repr__())
+        sys.stderr.write("\n%s\n" % lnode.name_id)
         
 
     def __dump_store(self):
-        self.__local_node.data_store.print_debug()
+        lnode.data_store.print_debug()
+
+    def __find_data(self):
+        keypart = eval(input())
+        #        searchpart = SpacePart(keypart.val2range())
+        findRQ = LookupRequest(keypart,lnode)
+        print("@_@ %f - %s - %s"%(findRQ.nonce, input(),repr(keypart)))
+        lnode.route_internal(RouteByCPE(findRQ,keypart))
 
     def __send_data(self):
         keypart = eval(input())
-        valuevector=[self.__local_node.net_info.get_port()]
+        valuevector=[lnode.net_info.get_port()]
         searchpart= SpacePart(keypart.val2range())
         insertRQ = RouteByCPE(InsertionRequest(valuevector,keypart),searchpart)
         # watch out for undefined keypart, as RouteByCPE could change it.
         #  if you don't like it, use the plain "search" routing.
-        self.__local_node.route_internal(insertRQ)
+        lnode.route_internal(insertRQ)
+
+    def __sleep(self):
+        seconds= int(input())
+        time.sleep(seconds)
 
     def __display(self):
         display_actions = list()
@@ -150,10 +161,13 @@ class ThreadTalker(threading.Thread):
         display_actions.append(("Display the local node CPE.", self.__display_node_cpe))
         display_actions.append(("Turn off menu display", self.__display_off))
         display_actions.append(("Echo value", self.__display_echo))
+        display_actions.append(("Sleep", self.__sleep))
+        display_actions.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
+
         self.__get_action(display_actions)
 
     def __display_node(self):
-        print(self.__local_node.__repr__())
+        print(lnode.__repr__())
 
     def __display_off(self):
         print("Echo off")
@@ -164,13 +178,13 @@ class ThreadTalker(threading.Thread):
         self.__interactive=True
 
     def __display_node_cpe(self):
-        print(self.__local_node.cpe.__repr__())
+        print(lnode.cpe.__repr__())
 
     def __add_data(self):
         keypart = eval(input())
         purevalues = eval(input()% "self.portno,self.uid")
         self.uid+=1
-        self.__local_node.data_store.add(keypart, purevalues)
+        lnode.data_store.add(keypart, purevalues)
 #        pass
 
     def __send_join_skiptree(self):
@@ -182,10 +196,10 @@ class ThreadTalker(threading.Thread):
         host = input()
         boot_net_info = NetNodeInfo((host, port))
 
-        self.__local_node.join(boot_net_info)
+        lnode.join(boot_net_info)
 
     def __send_leave(self):
-        self.__local_node.leave()
+        lnode.leave()
 
     def __send_RouteByNumericID(self):
 
@@ -194,9 +208,9 @@ class ThreadTalker(threading.Thread):
 
         num_id = NumericID(input())
 
-        payload_msg = SNPingRequest(self.__local_node, 0)
+        payload_msg = SNPingRequest(lnode, 0)
         route_msg = RouteByNumericID(payload_msg, num_id)
-        self.__local_node.route_internal(route_msg)
+        lnode.route_internal(route_msg)
 
 
 
@@ -213,19 +227,20 @@ def main():
     numeric_id = NumericID(sys.argv[INDEX_NUM_ID])
     net_info = NetNodeInfo(local_address)
 
-    local_node = Node(name_id, numeric_id, net_info)
+    global lnode
+    lnode = Node(name_id, numeric_id, net_info)
 
-    print("NameID: ", local_node.name_id.name, sep="")
-    print("NumericID: ", local_node.numeric_id.get_numeric_id_hex(), " (", int(local_node.numeric_id), ")", sep="")
+    print("NameID: ", lnode.name_id.name, sep="")
+    print("NumericID: ", lnode.numeric_id.get_numeric_id_hex(), " (", int(lnode.numeric_id), ")", sep="")
 
     # Create the sub-parts of the program
-    th_dispatcher = ThreadDispatcher(local_node)
+    th_dispatcher = ThreadDispatcher()
     threads.append(th_dispatcher)
 
     th_listener = ThreadListener(local_address, th_dispatcher.dispatcher)
     threads.append(th_listener)
 
-    th_talker = ThreadTalker(local_node)
+    th_talker = ThreadTalker()
     threads.append(th_talker)
 
     # Launch the sub-parts of the program
@@ -248,7 +263,7 @@ def main():
 
         if(not all_active):
             LOGGER.log(logging.WARNING, "%s :All components haven't been started correctly."
-                       %local_node.name_id.name)
+                       %lnode.name_id.name)
             break
 
 #     except KeyboardInterrupt:

@@ -21,7 +21,10 @@ LOGGER.addHandler(LOG_HANDLER)
 # ------------------------------------------------------------------------------------------------
 
 class Range(object):
-    ## 0_0 what is this, exactly ?
+    """ a continuous range along one dimension.
+        this is a possible value in a Component.
+        SpacePart.val2range() converts all its components into ranges.
+    """ 
     def __init__(self, p_min=None, p_max=None, min_included=True, max_included=True, strict=True):
         if(strict and p_min > p_max):
             raise ValueError("Range can't be created: the low bound exceeds high bound.")
@@ -90,7 +93,7 @@ class Range(object):
     def is_any_point_before_value(self, value):
         """Does at least one point of the range appear before the value ?"""
         value = value.value if value.__class__ == Component else value
-        print("any_point_before?",value.__class__,value,self.min.__class__,self.min)
+#       print("any_point_before?",value.__class__,value,self.min.__class__,self.min)
         return self.min_unbounded or self.min < value
 
     def includes_value(self, value):
@@ -137,7 +140,15 @@ class Range(object):
                 (rangeB.min_unbounded and ((rangeA.min_included and rangeB.max_included and rangeA.min <= rangeB.max) or (rangeA.min < rangeB.max))) or \
                 (rangeB.max_unbounded and ((rangeA.max_included and rangeB.min_included and rangeA.max >= rangeB.min) or (rangeA.max > rangeB.min))) or \
                 (rangeB.min >= rangeA.min and rangeB.min <= rangeA.max) or (rangeB.max <= rangeA.min and rangeB.max >= rangeA.max)
-
+    def __repr__(self):
+        if (self.__min == self.__max):
+            return "="+str(self.__min)
+        if (self.__min == None ):
+            return "<"+str(self.__max)
+        if (self.__max == None ):
+            return ">"+str(self.__min)
+        return str(self.__min)+"-"+str(self.__max)
+    
 
 class Dimension(object):
     """This class represents a dimension in the space."""
@@ -195,17 +206,13 @@ class Dimension(object):
 
 
 class Component(object):
-
+    """ a (dimension, value) pair with comparison capabilities
+        preferably grouped into a SpacePart.
+    """
     def __init__(self, dimension, value, virtual=False):
         ## what should be the type of value ??
         self.__dimension = dimension
         self.__value = value
-        ## test1171502
-#         if (value.__class__ == Range):
-#             self.__value = value
-#         else:
-#             self.__value = Range(value,value) # both included :)
-#/test
         self.__virtual = virtual
         
 
@@ -312,6 +319,23 @@ class SpacePart(object):
         return ranges
                                         
 
+    def includes_value(self, val):
+        """test wheter the spacepart 'val' (expected to be a point) fits our own range
+           this assumes that the Component's value are Range-s
+           """
+        dim = None
+        try:
+            for dim, comp in self.__coordinates.items():
+                com2 = val.get_component(dim)
+                if (com2 == None):
+                    return False
+                if (not comp.value.includes_value(com2)):
+                    return False
+        except:
+            raise ValueError("dimension %s couldn't be compared in %s <=> %s" %
+                             (dim, repr(self.dimensions), repr(val.dimensions)))
+        return True
+
     def exists(self, dimension):
         """Indicate if the dimension 'dimension' have been defined for this SpacePart."""
         return self.get_component(dimension) != None
@@ -331,7 +355,14 @@ class SpacePart(object):
     # Overwritten
 
     def __repr__(self):
-        return "<@SP@>"
+        st = "<@:"
+        keys = list(self.__coordinates.keys())
+        for key in keys:
+            component = self.__coordinates.get(key)
+            st = st + str(component)
+        return st+"@>"
+        
+        #return "<@SP@>"
 
     #
     # Debug methods
@@ -349,7 +380,11 @@ class SpacePart(object):
 
 
 class DataStore(object):
-
+    """ Provides a bare bone implementation of the local data store.
+    Here, the store is backed by a flat list (__data), with no attempt
+    to make add() or get() calls highly performant. Lots of room for
+    improvement.
+    """
     def __init__(self, l_data=None):
         self.__data = list()
         self.__data_by_dimension = dict()
@@ -359,6 +394,18 @@ class DataStore(object):
                 space_part, data = l_data[i]
                 self.add(space_part, data)
 
+    def get(self, range):
+#         dim_cpe = set(self.__data_by_dimension.keys())
+#         dim_msg = range.dimensions
+#         dim_new = dim_msg.difference(dim_cpe)
+        values = list()
+        # we should be able to work with partly defined dimensions.
+        for pair in self.__data:
+            if (range.includes_value(pair[0])):
+                values.append(pair[1])
+        return values
+
+        
     def add(self, space_part, data):
         """Add a data in the DataStore."""
         # Detect new dimension.
