@@ -333,9 +333,13 @@ class OutRequestManager(object):
         self.__local_node = local_node
 
     def send_msg(self, msg, dst_node):
-        """Send a message to a destination node."""
+        """Send a message to a destination node (ISA NetNodeInfo).
+    destination is usually the 'next hop' in a (hop, message pair)
+    as returned by the 'routing visitor'.
+        """
         try:
-            LOGGER.log(logging.DEBUG, str(msg.__class__) + " to " + dst_node.net_info.__repr__())
+            LOGGER.log(logging.DEBUG, "%s to %s" %
+                       (repr(msg), dst_node.net_info.__repr__()))
             payload = pickle.dumps(msg)
             net_string_msg = NetStringTools().format_data(payload)
             # fix1181403
@@ -347,7 +351,6 @@ class OutRequestManager(object):
 
             if (self.__is_online(client_socket)):
                 client_socket.sendall(net_string_msg)
-                #                    LOGGER.log(logging.DEBUG, "sent " + str(nb_bytes) + " bytes out of "+str(len(net_string_msg)))
             else:
                 self.node_disconnected(dst_node)
                 LOGGER.log(logging.WARNING, "-BIG ERR : Connection is not online !")

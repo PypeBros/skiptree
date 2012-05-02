@@ -153,6 +153,7 @@ class ThreadTalker(threading.Thread):
 
     def __sleep(self):
         seconds= int(input())
+        print("ignoring inputs for %i seconds" % seconds)
         time.sleep(seconds)
 
     def __display(self):

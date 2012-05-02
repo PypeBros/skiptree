@@ -908,8 +908,8 @@ the Node that delimits the area managed by the Node."""
         min_val, max_val = None, None
         for i in range(len(self.__internal_nodes) - 1, -1, -1):
             inode = self.__internal_nodes[i]
-            if(inode.component.dimension == dimension):
-                value = inode.component.value
+            if(inode.dimension == dimension):
+                value = inode.value
                 if(max_val == None and inode.direction == Direction.LEFT):
                     max_val = value
                 if(min_val == None and inode.direction == Direction.RIGHT):
@@ -981,6 +981,14 @@ the Node that delimits the area managed by the Node."""
                 dim_distributions[section_served] += nodes_for_last_section
 
         return dim_distributions
+
+    def pname(self):
+        m_repr = 'EQ:-'
+        for inode in self.__internal_nodes:
+            m_repr += '& %s' % repr(inode)
+        else:
+            m_repr += '/EQ'
+        return m_repr
 
     #
     # Overwritten

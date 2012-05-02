@@ -120,6 +120,15 @@ class RouteMessage(Visitee):
     def __init__(self, payload):
         Visitee.__init__(self)
         self.__payload = payload
+        self.__ttl = 16
+
+    @property
+    def ttl(self):
+        return self.__ttl
+
+    def decttl(self):
+        self.__ttl = self.__ttl-1
+        return self.__ttl
 
     @property
     def payload(self):
@@ -279,7 +288,13 @@ class RouteByCPE(RouteMessage):
 
     def accept(self, visitor):
         # see localevent.py : RouterVisitor.visit_RouteByCPE
-        return visitor.visit_RouteByCPE(self)
+        if self.decttl()>0:
+            return visitor.visit_RouteByCPE(self)
+        else:
+            return None
+
+    def __repr__(self):
+        return "<byCPE::%s>"%repr(self.payload)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -715,6 +730,8 @@ class LookupReply(AppMessage):
     def accept(self, visitor):
         visitor.visit_LookupReply(self)
 
+    def __repr__(self):
+        return "LRY#%f"%self.__nonce
     
 
 class LookupRequest(AppMessage):
@@ -726,6 +743,8 @@ class LookupRequest(AppMessage):
         self.__nonce = random.random()
         self.__from = node
 
+    def __repr__(self):
+        return "LRQ#%f"%self.__nonce
 
     @property
     def key(self):

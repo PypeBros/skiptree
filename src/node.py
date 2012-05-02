@@ -259,6 +259,12 @@ class Node(object):
     #
     # Overwritten
 
+    def pname(self):
+        return "<Node--%i, %s :: %s>" % (
+            repr(self.__numeric_id), repr(self.__name_id),
+            self.cpe.pname()
+            )
+
     def __repr__(self):
         return "<Node--" + self.__numeric_id.__repr__() + ", " + self.__name_id.__repr__() + ", " \
                     + self.__partition_id.__repr__() + ", " \
@@ -312,6 +318,8 @@ class Node(object):
         state['_Node__neighbourhood'] = None
         state['_Node__status_up'] = None
         state['_Node__data_store'] = None
+        state['_Node__running_op'] = None
+        state['_Node__major_state'] = None
 
         return state
 

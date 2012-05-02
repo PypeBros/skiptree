@@ -25,14 +25,20 @@ LOGGER.addHandler(LOG_HANDLER)
 class RouterReflect(object):
 
     def __init__(self):
+        self.__lastcall = list()
         pass
     # those could be static.
+
+    @property
+    def trace(self):
+        return self.__lastcall
 
     #
     # Route by CPE (for *DATA* Insertion)
     #  only valid if message ISA RouteByCPE.
     #  only valid if message.space_part is a Range, not a Component (?)
     def by_cpe_get_next_hop_insertion(self,local_node, message):
+        self.__lastcall=['bycpe']
         try:
             # Add virtual dimensions for the undefined ones.
             dim_cpe = local_node.cpe.dimensions
@@ -67,6 +73,7 @@ class RouterReflect(object):
     # Point and Node have same dimension defined.   
 
     def __by_cpe_get_next_hop_default(self, local_node, message):
+        self.__lastcall.append(repr(local_node.cpe))
         left, here, right = local_node.cpe.which_side_space(message.space_part)
         if(here):
             # The message is intended to the local node.
@@ -80,6 +87,7 @@ class RouterReflect(object):
                 # Loop the neighbourhood by the farthest node.
                 for height in range(neigbourhood.get_nb_ring() - 1, -1, -1):
                     neighbour = neigbourhood.get_neighbour(direction, height)
+                    self.__lastcall.append("%s (%i,%s)"%(neighbour.pname,height,repr(direction)))
                     neighbour_pid = neighbour.partition_id
 
                     if(RouterReflect.__check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node.partition_id)):

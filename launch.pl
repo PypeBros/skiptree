@@ -11,7 +11,7 @@ $MYSELF=0+$ARGV[0];
 ## configuration: where is the Master Control Program ?
 $MCP_IP = "139.165.223.18";
 $MCP_PORT= 8086;
-#$TRACING ="strace -enetwork -f -s512 -o /tmp/py.trace";
+#$TRACING ="strace -enetwork -f -s512 -o /tmp/py.trace"; # have you installed strace on all nodes?
 $TRACING=''; # off
 
 # define the local variables.
@@ -28,63 +28,78 @@ $launchdate=filetag("launch.pl");
   my @base32=('a'..'z', 0..5);
   $nameID = join '', (map $base32[rand(@base32)], (0..4));
 }
-
+$FIFO = "$NAME-2808$MYSELF.cmd";
 # establish the communication path with the python node.
 
-print STDERR "[[CLU rev $launchdate - $NAME = $IP ($NUM)]]\n";
-print STDERR "[- running DISco rev $sourcedate -]\n";
-system "mkfifo $NAME-2808$MYSELF.cmd" unless -e "$NAME-2808$MYSELF.cmd";
-open DONE,"$TRACING python3 src/__main__.py $IP 2808$MYSELF $nameID $NUM < $NAME-2808$MYSELF.cmd |" or die "cannot launch";
-open CMD,">$NAME-2808$MYSELF.cmd" or die "no FIFO for commands";
-sleep 5;
+eval {
 
-# run the main control loop.
+  print STDERR "[[CLU rev $launchdate - $NAME = $IP ($NUM)]]\n";
+  print STDERR "[- running DISco rev $sourcedate -]\n";
+    unlink $FIFO if -e $FIFO && ! -p $FIFO;
+    
+    system "mkfifo $FIFO" unless -e $FIFO;
+  open CMD,">$FIFO" or die "no FIFO for commands";
+  select CMD ; $|=1 ; select STDOUT;
 
-select CMD ; $|=1 ; select STDOUT;
-print CMD "0\n3\n0_0 HELLO\n0\n3\n#_# READY\n";
+  open DONE,"$TRACING python3 src/__main__.py $IP 2808$MYSELF $nameID $NUM < $FIFO |" or die "cannot launch";
 
-while (<DONE>) {
-  /^[#0]_[#0] / or next;
-  print STDERR ">$NUM> $_";
-  push @report,$_;
-  next if /^0_0 /;
-  # messages starting with 0_0 are informative,
-  # messages starting with #_# denote state changes.
+  # run the main control loop.
+  
 
-  print STDERR "$NAME reported $_";
-  $commands = wait_for_next_step(@report);
-  @report=();
-  if ($commands=~/^WAIT/) {
-    next;
-  }
-  if ($commands=~/^TYPE (.*)/) {
-    print STDERR "[$NUM\[$NAME typing commands $1]]\n";
-    @lines = split /;/,$1;
-    foreach (@lines) {
-      print CMD "$_\n";
+  print CMD "0\n3\n0_0 HELLO\n"; # echoes the HELLO message
+  print CMD "0\n4\n5\n"; # sleeps (the stdin reader thread) for 5 second
+  print CMD "0\n3\n#_# READY\n"; # echoes the READY message.
+#  sleep 5;
+  
+  
+  while (<DONE>) {
+    /^[#0]_[#0] / or next;
+    print STDERR ">$NUM> $_";
+    push @report,$_;
+    next if /^0_0 /;
+    # messages starting with 0_0 are informative,
+    # messages starting with #_# denote state changes.
+    
+    print STDERR "$NAME reported $_";
+    $commands = wait_for_next_step(@report);
+    @report=();
+    if ($commands=~/^WAIT/) {
+      next;
+    }
+    if ($commands=~/^TYPE (.*)/) {
+      chomp $1;
+      print STDERR "[$NUM\[$NAME typing commands $1]] ";
+      @lines = split /;/,$1;
+      foreach (@lines) {
+	print CMD "$_\n";
+      }
+      print STDERR " done.\n";
+    }
+    if ($commands=~/^LOAD (.*)/) {
+      # there's intentionally no protection on remotely sent request to
+      #  run process through this command, so that we can zcat or csv2py
+      #  on the fly.
+      my $cmd = $1;
+      open DATA,"$cmd" or die "unable to LOAD $cmd";
+      my $count=0;
+      while(<DATA>) {
+	print CMD; $count++;
+      }
+      print STDERR "[$NUM\[ $count statements produced from $1]]\n";
+    }
+    if ($commands=~/^QUIT/) {
+      close CMD;
+    }
+    if ($commands=~/^KILL/) {
+      system "killall python3";
+      system "killall tail";
+      exit 0;
     }
   }
-  if ($commands=~/^LOAD (.*)/) {
-    # there's intentionally no protection on remotely sent request to
-    #  run process through this command, so that we can zcat or csv2py
-    #  on the fly.
-    my $cmd = $1;
-    open DATA,"$cmd" or die "unable to LOAD $cmd";
-    my $count=0;
-    while(<DATA>) {
-      print CMD; $count++;
-    }
-    print STDERR "[$NUM\[ $count statements produced from $1]]\n";
-  }
-  if ($commands=~/^QUIT/) {
-    close CMD;
-  }
-  if ($commands=~/^KILL/) {
-    system "killall python3";
-    system "killall tail";
-    exit 0;
-  }
-}
+};
+print STDERR "LAUNCHER FOR $nameID @ $NAME DIED !?\n --  $@ $!\n -- $?\n";
+print CMD "0\n3\nAOUCH\n7\n";
+exit -1;
 
 sub wait_for_next_step {
   my $Pip = inet_aton($MCP_IP);

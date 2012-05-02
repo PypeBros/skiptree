@@ -61,15 +61,25 @@ class MessageDispatcher(object):
             message = self.__queue.get()
 #            try:
             destinations = message.accept(self.__visitor_routing)
-            assert destinations != None, "Destinations in the LocalEvent is None."
-            for next_hop, message in destinations:
-                if(next_hop != None):
-                    if(next_hop.net_info == self.__local_node.net_info):
-                        message.payload.accept(self.__visitor_processing)
+            if destinations != None:
+                if message.ttl<10:
+                    LOGGER.log(logging.DEBUG, "[DBG:%s] TTL low for %s in %s" %
+                               (self.__local_node.name_id,
+                                repr(message), repr(self.__visitor_routing)))
+                    
+                for next_hop, message in destinations:
+                    if(next_hop != None):
+                        if(next_hop.net_info == self.__local_node.net_info):
+                            message.payload.accept(self.__visitor_processing)
+                        else:
+                            self.__local_node.sender.send_msg(message, next_hop)
                     else:
-                        self.__local_node.sender.send_msg(message, next_hop)
-                else:
-                    assert False , "Next hop == None"
+                        assert False , "FIXME: Next hop == None (M: %s)"% repr(message)
+            else:
+                LOGGER.log(logging.DEBUG,
+                           "[DBG:%s] no destination for %s in %s" %
+                           (self.__local_node.name_id,
+                            repr(message), repr(self.__visitor_routing)))
             sys.stdout.flush()
 #             except:
 #                 # http://docs.python.org/library/sys.html#sys.exc_info
@@ -132,6 +142,9 @@ class RouterVisitor(VisitorRoute):
         return self.__reflector.by_cpe_get_next_hop_insertion(self.__local_node, message)
         # MessageDispatcher.dispatch() will be happy with a list of <neighbour, message>
 
+    def __repr__(self):
+        return "<RouterVisitor:"+repr(self.__reflector.trace)+">"
+
 ##      Traceback (most recent call last):
 ##  File "/usr/lib/python3.1/threading.py", line 516, in _bootstrap_inner
 ##    self.run()
@@ -148,7 +161,10 @@ class RouterVisitor(VisitorRoute):
 
 
 class Router(object):
-
+    """ An object that returns (hop, message) as needed by the
+        dispatcher and its routing visitor for different type of
+        routing.
+        """
     def __init__(self, local_node):
         self.__local_node = local_node
 

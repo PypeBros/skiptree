@@ -1,4 +1,7 @@
 #!/usr/bin/perl
+# parses the output of a check2py | __main__.py run and ensures that 
+#  all the retrieved samples match with the pcap data.
+
 
 while (<>) {
   if (/^._@ ([0-9.]+) - \['(\d+)'\] - <@\:=(.*)@>/) {
