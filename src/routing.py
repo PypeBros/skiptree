@@ -63,16 +63,60 @@ class RouterReflect(object):
 
             # NEAT! we now have a routable message ^_^
 
-            return self.__by_cpe_get_next_hop_default(local_node, message)
+            return self.__by_cpe_get_next_hop_default(local_node, message, False)
 
         except CPEMissingDimension as dim_err:
+            LOGGER.log(logging.DEBUG, "[DBG:%s] processing %s - %s",
+                       (repr(local_node.name_id),repr(message),repr(self.__lastcall)))
+                
             assert False, "This should never happen !"
 
+
+    def by_cpe_get_next_hop_forking(self, local_node, message):
+        self.__lastcall=['bycpe+f']
+        dest = []
+        left, here, right = local_node.cpe.which_side_space(message.space_part, True)
+        if (here) :
+            # TODO : that shouldn't be 'naked' message, but a clone with 
+            #   search range that has been 'constraint' to stick here.
+            newmsg = copy.copy(message)
+            newmsg.limit=Range(local_node.partition_id,local_node.partition_id)
+            dest.append((local_node, newmsg))
+        directions = list()
+        if (left):
+            directions.append((Direction.LEFT,
+                               Range(None, local_node.partition_id, False,True,False)))
+        if (right):
+            directions.append((Direction.RIGHT,
+                               Range(local_node.partition_id, None, True,False,False)))
+
+        part = message.space_part
+        neighbourhood = local_node.neighbourhood
+        lastpid = None
+        
+        for dirx, prange in directions:
+            for height in range(neighbourhood.nb_ring-1,-1,-1):
+                ngh = neighbourhood.get_neighbour(dirx, height)
+                self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
+                pid = ngh.partition_id
+                if (RouterReflect.__check_position_partition_tree(dirx, lastpid, pid, local_node.partition_id)):
+                    lastpid = pid
+                    left, here, right = ngh.cpe.which_side_space(part, True)
+                    if (here or RouterReflect.__is_last(dirx, left, right)):
+                        # there should be only one next hop in each direction
+                        # it will be in charge of finding 'best nodes' if any.
+                        newmsg = copy.copy(message)
+                        newmsg.limit = prange.restrict(dirx,pid)
+                        dest.append((ngh, newmsg))
+                        break
+
+        return dest
+                    
     #
     # Route by CPE
     # Point and Node have same dimension defined.   
 
-    def __by_cpe_get_next_hop_default(self, local_node, message):
+    def __by_cpe_get_next_hop_default(self, local_node, message, canfork):
         self.__lastcall.append(repr(local_node.cpe))
         left, here, right = local_node.cpe.which_side_space(message.space_part)
         if(here):
@@ -83,21 +127,21 @@ class RouterReflect(object):
             neigbourhood = local_node.neighbourhood
 
             directions = (Direction.LEFT, Direction.RIGHT)
-            for direction in directions:
+            for dirx in directions:
                 # Loop the neighbourhood by the farthest node.
-                for height in range(neigbourhood.get_nb_ring() - 1, -1, -1):
-                    neighbour = neigbourhood.get_neighbour(direction, height)
-                    self.__lastcall.append("%s (%i,%s)"%(neighbour.pname,height,repr(direction)))
+                for height in range(neigbourhood.nb_ring - 1, -1, -1):
+                    neighbour = neigbourhood.get_neighbour(dirx, height)
+                    self.__lastcall.append("%s (%i,%s)"%(neighbour.pname,height,repr(dirx)))
                     neighbour_pid = neighbour.partition_id
 
-                    if(RouterReflect.__check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node.partition_id)):
+                    if(RouterReflect.__check_position_partition_tree(dirx, last_pid_checked, neighbour_pid, local_node.partition_id)):
                         # Now, we are sure that the neighbour_pid is really smaller (higher) 
                         # than the local node one when the direction is set to LEFT (RIGHT).
                         # So, RIGHT is RIGHT and LEFT is LEFT.
                         last_pid_checked = neighbour_pid
 
                         left, here, right = neighbour.cpe.which_side_space(message.space_part)
-                        if(here or RouterReflect.__is_last(direction, left, right)):
+                        if(here or RouterReflect.__is_last(dirx, left, right)):
                             # The destination node have been found.
                             return [(neighbour, message)]
 
@@ -135,7 +179,7 @@ class RouterReflect(object):
             neigbourhood = local_node.neighbourhood
 
             for direction in directions:
-                for height in range(neigbourhood.get_nb_ring() - 1, -1, -1):
+                for height in range(neigbourhood.nb_ring - 1, -1, -1):
                     neighbour = neigbourhood.get_neighbour(direction, height)
                     neighbour_pid = neighbour.partition_id
 

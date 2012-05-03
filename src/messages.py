@@ -270,6 +270,7 @@ class RouteByCPE(RouteMessage):
         #assert(space_part.range)
         self.__space_part = copy.deepcopy(space_part)
         self.__limit = Range(None, None, False, False, False)
+        self.__forking = False
 
     @property
     def space_part(self):
@@ -285,6 +286,16 @@ class RouteByCPE(RouteMessage):
     def limit(self, new_limit):
         """Set the limit (a Range object) in witch the message must remain."""
         self.__limit = new_limit
+
+    @property
+    def forking(self):
+        """ is the message allowed to fork ?
+            if true, this implies it may not cover all the dimensions.
+            """
+        return self.__forking
+    @forking.setter
+    def forking(self, bool):
+        self.__forking=bool
 
     def accept(self, visitor):
         # see localevent.py : RouterVisitor.visit_RouteByCPE

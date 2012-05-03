@@ -38,19 +38,19 @@ class Neighbourhood(object):
 
     #
     # Properties
-
-    def get_nb_ring(self):
+    @property
+    def nb_ring(self):
         """Return the number of neighbours ring."""
         return len(self.__rings)
 
     def get_ring(self, ring_level):
         """Return the neighbours ring of a level."""
-        assert(0 <= ring_level and ring_level < self.get_nb_ring())
+        assert(0 <= ring_level and ring_level < self.nb_ring)
         return self.__rings[ring_level]
 
     def get_neighbour(self, direction, ring_level):
         """Return the closest neighbour in one direction."""
-        assert(0 <= ring_level and ring_level < self.get_nb_ring())
+        assert(0 <= ring_level and ring_level < self.nb_ring)
 
         ring_set = self.__rings[ring_level]
         half_ring_set = ring_set.get_side(direction)

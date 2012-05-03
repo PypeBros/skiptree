@@ -258,11 +258,11 @@ class Node(object):
 
     #
     # Overwritten
-
+    @property
     def pname(self):
         return "<Node--%i, %s :: %s>" % (
-            repr(self.__numeric_id), repr(self.__name_id),
-            self.cpe.pname()
+            self.__numeric_id, repr(self.__name_id),
+            self.cpe.pname
             )
 
     def __repr__(self):
@@ -360,7 +360,7 @@ class NodeStatusPublisher(threading.Thread):
     def __update_status(self):
         """Ping current neighbours and repair locals rings."""
         neighbourhood = self.__local_node.neighbourhood
-        nb_ring_level = neighbourhood.get_nb_ring()
+        nb_ring_level = neighbourhood.nb_ring
 
         print("0_0 updating rings: ",nb_ring_level);
         for ring_level in range(nb_ring_level):

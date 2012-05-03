@@ -26,6 +26,13 @@ class Direction(object):
             return Direction.RIGHT
 
     @staticmethod
+    def get_directions(direction):
+        opposite_side = Direction.get_opposite(direction)
+        left  = (opposite_side == Direction.LEFT)
+        right = (opposite_side == Direction.RIGHT)
+        return [left,right]
+
+    @staticmethod
     def get_name(direction):
         if (direction == Direction.RIGHT):
             return "R"

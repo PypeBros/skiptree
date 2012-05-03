@@ -57,7 +57,7 @@ while (<INPUT>) {
 }
 
 print STDERR "check terminated at ($timebase + $timestep > $timemax)\n";
-print "0\n3\ninteractive mode enabled\n6\n";
+print "0\n3\ninteractive mode enabled\n"; #6\n";
 $|=1; # auto-flush STDOUT
 while (<STDIN>) {
   print;

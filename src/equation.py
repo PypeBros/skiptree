@@ -35,8 +35,21 @@ class Range(object):
         self.__min_included = min_included
         self.__max_included = max_included
 
+    def restrict(self,dir, value):
+        """ restricts the current range in one direction with a new cut value
+            e.g. [12,20].restrict(LEFT,16) == [16,20]
+            """
+        r = Range(self.__min, self.__max, self.min_included, self.max_included, False )
+        if (dir==Direction.LEFT and (self.min_unbounded or r.__min<value)):
+            r.__min=value
+        if (dir==Direction.RIGHT and (self.max_unbounded or r.__max>value)):
+            r.__max=value
+        return r
+
     #
     # Properties
+
+
 
     @property
     def min(self):
@@ -280,10 +293,8 @@ class SpacePart(object):
         """
         Initialize a SpacePart.
         
-        'coordinates' are supposed to be a list of 'component'.
-        The list shouldn't contain two 'component' for the same 'dimension'.
+        'coordinates' is a Dimension -> Component dictionary
         """
-        # A coordinate must be find easily : dictionary advised.
         self.__coordinates = {}
         if(coordinates != None):
             for component in coordinates:
@@ -317,7 +328,11 @@ class SpacePart(object):
         for dimension, component in self.__coordinates.items():
             ranges.append(Component(dimension, Range(component.value, component.value)))
         return ranges
-                                        
+
+    def first_component(self):
+        for v in iter(self.__coordinates.values()):
+            return v
+    
 
     def includes_value(self, val):
         """test wheter the spacepart 'val' (expected to be a point) fits our own range
@@ -723,7 +738,6 @@ class InternalNode(Component):
 
     def __init__(self, direction, dimension, value):
         Component.__init__(self, dimension, value, False)
-
         self.__direction = direction
 
     #
@@ -764,7 +778,10 @@ class InternalNode(Component):
     def __is_left(self, m_range):
         """Is a range on the left of the internal cutting plane?"""
         # The range must be at the left of a value (range <= value).
-        # The only way for a range to be Left managed is to have at least one point before the cutting value or to be equal.
+        # The only way for a range to be Left managed is to have at least
+        # one point before the cutting value or to be equal.
+        # self.value is a Component property.
+        
         if (m_range.__class__ == Range):
             return m_range.is_any_point_before_value(self.value) or m_range.includes_value(self.value)
         else:
@@ -922,16 +939,29 @@ the Node that delimits the area managed by the Node."""
     #
     #
 
-    def which_side_space(self, space_part):
-        """ Indicates to which side of the node belongs the 'space_part'."""
+    def which_side_space(self, space_part, forking=False):
+        """ Indicates to which side of the node belongs the 'space_part'.
+            'Left' means one of the internal nodes would have to be followed
+            to the left instead so that the desired part is reached.
+        """
         nb_here = 0
         here, left, right = False, False, False
 
         for inode in self.__internal_nodes:
 
             if(not space_part.exists(inode.dimension)):
-                raise CPEMissingDimension("A mandatory dimension isn't defined." , inode.dimension)
-
+                if (not forking):
+                    raise CPEMissingDimension(
+                        "Mandatory dimension %s isn't defined in %s"%
+                        (repr(inode.dimension),repr(space_part)), inode.dimension)
+                else:
+                    # no clue, a split is required.
+                    # - here? is still undefined: further inodes could invalidate it.
+                    # - left? or right? will be set depending on our own direction
+                    #   on the offending inode.
+                    (l,r) = Direction.get_directions(Direction.get_opposite(inode.direction))
+                    left |=l ; right |=r
+                    nb_here+=1
             else:
                 m_range = space_part.get_component(inode.dimension)
 
@@ -947,7 +977,7 @@ the Node that delimits the area managed by the Node."""
                     left |= (opposite_side == Direction.LEFT)
                     right |= (opposite_side == Direction.RIGHT)
                     break
-
+        # you need all the dimensions to say 'it's here' so that it's actually here.
         here |= (nb_here == len(self.__internal_nodes))
         assert True == left | here | right, "The request coudn't be oriented."
 
@@ -982,6 +1012,7 @@ the Node that delimits the area managed by the Node."""
 
         return dim_distributions
 
+    @property
     def pname(self):
         m_repr = 'EQ:-'
         for inode in self.__internal_nodes:

@@ -61,7 +61,7 @@ class MessageDispatcher(object):
             message = self.__queue.get()
 #            try:
             destinations = message.accept(self.__visitor_routing)
-            if destinations != None:
+            if destinations != None and len(destinations)>0:
                 if message.ttl<10:
                     LOGGER.log(logging.DEBUG, "[DBG:%s] TTL low for %s in %s" %
                                (self.__local_node.name_id,
@@ -139,7 +139,15 @@ class RouterVisitor(VisitorRoute):
         return message.route(self.__local_node)
 
     def visit_RouteByCPE(self, message):
-        return self.__reflector.by_cpe_get_next_hop_insertion(self.__local_node, message)
+        # message ISA RouteByCPE
+        # payload ISA ApplicationMessage
+        assert (message.space_part.first_component().value != None),(
+           "message %s has invalid spacepart (no component value for %s)"%
+           (repr(message),repr(message.space_part.first_component())))
+        if (message.forking):
+            return self.__reflector.by_cpe_get_next_hop_insertion(self.__local_node, message)
+        else:
+            return self.__reflector.by_cpe_get_next_hop_forking(self.__local_node, message)
         # MessageDispatcher.dispatch() will be happy with a list of <neighbour, message>
 
     def __repr__(self):
@@ -232,7 +240,7 @@ class Router(object):
         direction = self.by_name_get_direction(local_node.name_id, message.dest_name_id)
 
         # Loop from the highest ring to the smallest one. 
-        for height in range(neigbourhood.get_nb_ring() - 1, -1, -1):
+        for height in range(neigbourhood.nb_ring - 1, -1, -1):
             half_ring = neigbourhood.get_ring(height).get_side(direction)
             next_hop = half_ring.get_closest()
 
