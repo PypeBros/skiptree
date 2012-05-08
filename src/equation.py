@@ -26,7 +26,7 @@ class Range(object):
         SpacePart.val2range() converts all its components into ranges.
     """ 
     def __init__(self, p_min=None, p_max=None, min_included=True, max_included=True, strict=True):
-        if(strict and p_min > p_max):
+        if(strict and p_min!=None and p_max!=None and p_min > p_max):
             raise ValueError("Range can't be created: the low bound exceeds high bound.")
 
         self.__min = p_min
@@ -332,6 +332,9 @@ class SpacePart(object):
     def first_component(self):
         for v in iter(self.__coordinates.values()):
             return v
+
+    def generalize(self, dimension):
+        del self.__coordinates[dimension]
     
 
     def includes_value(self, val):
@@ -893,7 +896,7 @@ the Node that delimits the area managed by the Node."""
     #
 
     def add_node(self, inode):
-        """Add a node in the CPE."""
+        """Append a node in the CPE."""
         self.__update_dimension_count(inode.dimension, +1)
         self.__internal_nodes.append(inode)
 

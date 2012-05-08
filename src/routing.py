@@ -90,6 +90,7 @@ class RouterReflect(object):
             directions.append((Direction.RIGHT,
                                Range(local_node.partition_id, None, True,False,False)))
 
+        self.__lastcall.append("scanning rings "+repr(directions))
         part = message.space_part
         neighbourhood = local_node.neighbourhood
         lastpid = None

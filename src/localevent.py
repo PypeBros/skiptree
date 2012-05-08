@@ -11,7 +11,6 @@ import sys
 
 # ResumeNet imports
 from equation import InternalNode, DataStore
-
 from messages import VisitorRoute, VisitorMessage
 from messages import RouteByNameID, RouteDirect
 from messages import SNJoinRequest, SNJoinReply, SNLeaveReply
@@ -19,6 +18,7 @@ from messages import STJoinReply, STJoinRequest, STJoinError, JoinException
 from messages import IdentityReply
 from messages import NeighbourhoodNet
 from messages import LookupRequest, LookupReply
+
 from routing import RouterReflect
 from nodeid import NodeID, PartitionID
 from util import Direction
@@ -54,32 +54,40 @@ class MessageDispatcher(object):
         """Add an event in the dispatcher."""
         self.__queue.put(event)
 
+    def get_destinations(self, message):
+        destinations = message.accept(self.__visitor_routing)
+        if message.ttl<10:
+            LOGGER.log(logging.DEBUG, "[DBG:%s] TTL low for %s in %s" %
+                       (self.__local_node.name_id,
+                        repr(message), repr(self.__visitor_routing)))
+        return destinations
+
+    def routing_trace(self):
+        return repr(self.__visitor_routing)
+
+    def dispatch_one(self, msgcause, destinations):
+        if destinations != None and len(destinations)>0:
+            for next_hop, message in destinations:
+                if(next_hop != None):
+                    if(next_hop.net_info == self.__local_node.net_info):
+                        message.payload.accept(self.__visitor_processing)
+                    else:
+                        self.__local_node.sender.send_msg(message, next_hop)
+                else:
+                    assert False , "FIXME: Next hop == None (M: %s)"% repr(message)
+        else:
+            LOGGER.log(logging.DEBUG,
+                       "[DBG:%s] no destination for %s in %s" %
+                       (self.__local_node.name_id,
+                        repr(message), repr(self.__visitor_routing)))
+        
+
     def dispatch(self):
         """Dispatch the messages through components."""
         #TODO: Change exception management, local_node comparison  
         while True:
             message = self.__queue.get()
-#            try:
-            destinations = message.accept(self.__visitor_routing)
-            if destinations != None and len(destinations)>0:
-                if message.ttl<10:
-                    LOGGER.log(logging.DEBUG, "[DBG:%s] TTL low for %s in %s" %
-                               (self.__local_node.name_id,
-                                repr(message), repr(self.__visitor_routing)))
-                    
-                for next_hop, message in destinations:
-                    if(next_hop != None):
-                        if(next_hop.net_info == self.__local_node.net_info):
-                            message.payload.accept(self.__visitor_processing)
-                        else:
-                            self.__local_node.sender.send_msg(message, next_hop)
-                    else:
-                        assert False , "FIXME: Next hop == None (M: %s)"% repr(message)
-            else:
-                LOGGER.log(logging.DEBUG,
-                           "[DBG:%s] no destination for %s in %s" %
-                           (self.__local_node.name_id,
-                            repr(message), repr(self.__visitor_routing)))
+            self.dispatch_one(message,self.destinations(message))
             sys.stdout.flush()
 #             except:
 #                 # http://docs.python.org/library/sys.html#sys.exc_info
@@ -413,6 +421,7 @@ class JoinProcessor(VisitorMessage):
                 self.__local_node.sign("sent joinreply (ask phase)")
 
         elif(message.phase == STJoinRequest.STATE_ACCEPT):
+            # blindly setup what the other node's compute_data_and_cpe has defined.
             self.__local_node.sign("Update the local node data");
             self.__local_node.cpe = self.__new_local_cpe
             self.__local_node.data_store = DataStore(self.__new_local_data)

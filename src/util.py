@@ -27,9 +27,9 @@ class Direction(object):
 
     @staticmethod
     def get_directions(direction):
-        opposite_side = Direction.get_opposite(direction)
-        left  = (opposite_side == Direction.LEFT)
-        right = (opposite_side == Direction.RIGHT)
+#        opposite_side = Direction.get_opposite(direction)
+        left  = (direction == Direction.LEFT)
+        right = (direction == Direction.RIGHT)
         return [left,right]
 
     @staticmethod
