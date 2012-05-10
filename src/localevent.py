@@ -63,7 +63,7 @@ class MessageDispatcher(object):
         return destinations
 
     def routing_trace(self):
-        return repr(self.__visitor_routing)
+        return self.__visitor_routing.trace
 
     def dispatch_one(self, msgcause, destinations):
         if destinations != None and len(destinations)>0:
@@ -79,7 +79,7 @@ class MessageDispatcher(object):
             LOGGER.log(logging.DEBUG,
                        "[DBG:%s] no destination for %s in %s" %
                        (self.__local_node.name_id,
-                        repr(message), repr(self.__visitor_routing)))
+                        repr(msgcause), repr(self.__visitor_routing)))
         
 
     def dispatch(self):
@@ -87,7 +87,7 @@ class MessageDispatcher(object):
         #TODO: Change exception management, local_node comparison  
         while True:
             message = self.__queue.get()
-            self.dispatch_one(message,self.destinations(message))
+            self.dispatch_one(message,self.get_destinations(message))
             sys.stdout.flush()
 #             except:
 #                 # http://docs.python.org/library/sys.html#sys.exc_info
@@ -160,6 +160,9 @@ class RouterVisitor(VisitorRoute):
 
     def __repr__(self):
         return "<RouterVisitor:"+repr(self.__reflector.trace)+">"
+    @property
+    def trace(self):
+        return self.__reflector.trace
 
 ##      Traceback (most recent call last):
 ##  File "/usr/lib/python3.1/threading.py", line 516, in _bootstrap_inner

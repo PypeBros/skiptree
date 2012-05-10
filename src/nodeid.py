@@ -267,33 +267,47 @@ class BitifiedByte(object):
 import sys
 
 class PartitionID(NodeID):
+    """ Each node is assigned a random partition ID (PID) when it is created.
+        upon joining another node, it will receive a new one (join_partition_id)
+        in its STJoinReply message.
 
-    LOW, UP = 0.0, 1.0
+        compute_partition_id then takes into account the welcoming node's PID,
+        it's immediate neighbour PID and the neighbour's direction in order
+        to generate an appropriate (random) PID in the desired area.
+        """
+    LOW, UP = PartitionID(0.0), PartitionID(1.0)
 
     EPSILON = sys.float_info.epsilon
+
+    def __init__(self,v):
+        self.__v=v
+
+    @property
+    def v(self):
+        return self.__v
 
     @staticmethod
     def gen():
         """Return a random 'Partition ID'."""
-        return PartitionID.gen_btw(PartitionID.LOW, PartitionID.UP)
+        return PartitionID(PartitionID.gen_btw(PartitionID.LOW, PartitionID.UP))
 
     @staticmethod
-    def gen_bef(number):
-        """Return a 'Partition ID' that stands before 'number'."""
-        return PartitionID.gen_btw(PartitionID.LOW, number)
+    def gen_bef(ref):
+        """Return a 'Partition ID' that stands before 'ref'."""
+        return PartitionID.gen_btw(PartitionID.LOW, ref)
 
     @staticmethod
     def gen_btw(lower, upper):
         """Return a 'Partition ID' that resides in closed range (Lower, Upper)."""
-        partition_id = lower
-        while(partition_id == lower or partition_id == upper):
-            new_pid = random.uniform(lower, upper)
-            if (abs(new_pid - partition_id) <= PartitionID.EPSILON):
+        pick = lower
+        while(pick == lower or pick == upper):
+            new_pid = random.uniform(lower.v, upper.v)
+            if (abs(new_pid - pick.v) <= PartitionID.EPSILON):
                 raise ValueError
-            partition_id = new_pid
-        return partition_id
+            pick = PartitionID(new_pid)
+        return pick
 
     @staticmethod
-    def gen_aft(number):
-        """Return a 'Partition ID' that stands after 'number'."""
-        return PartitionID.gen_btw(number, PartitionID.UP)
+    def gen_aft(ref):
+        """Return a 'Partition ID' that stands after 'ref'."""
+        return PartitionID.gen_btw(ref, PartitionID.UP)

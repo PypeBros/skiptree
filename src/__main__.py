@@ -65,7 +65,8 @@ class ThreadListener(threading.Thread):
         try:
             self.__listener.serve_forever()
         except:
-            LOGGER.log(logging.ERROR, "The listener coudn't be started for %s." % address)
+            LOGGER.log(logging.ERROR, "The listener coudn't be started for %s." %
+                       repr(self.__listener.address))
 
 class ThreadTalker(threading.Thread):
 

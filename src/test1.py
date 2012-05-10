@@ -1,8 +1,11 @@
+import sys # for exceptions
+import traceback
+
 from util import Direction
 
 from equation import CPE, Dimension, SpacePart, InternalNode, Component, Range
 from nodeid import NodeID, NameID, NumericID
-from node import NetNodeInfo, Node
+from node import NetNodeInfo, Node, PartitionID
 
 from messages import LookupRequest, RouteByCPE
 from localevent import MessageDispatcher
@@ -141,15 +144,21 @@ class Tester(object):
         # neighbourhood is structued in rings for each skipnet level.
         #   this is automatically decided by the common prefix in the (randomly generated)
         #   numerical ID.
+
         n2 = self.createNode("n2",'127.0.0.2')
         n3 = self.createNode("n3",'127.0.0.3')
-
-        ave.add_neighbour(0,n2)
-        ave.add_neighbour(0,n3)
 
         if (lid.get_longest_prefix_length(n2.numeric_id) >
             lid.get_longest_prefix_length(n3.numeric_id)):
             n = n2 ; n2 = n3 ; n3 = n
+
+        # nameIDs are used in the neighbourhood ordering
+        n2.name_id = NameID("right")
+        n3.name_id = NameID("_left")
+
+        ave.add_neighbour(0,n2)
+        ave.add_neighbour(0,n3)
+
 
         n2.cpe = self.createCPE([
             ['a','>','girl'],
@@ -158,16 +167,31 @@ class Tester(object):
             ['c','>','soft']
             ])
 
+        # partition IDs are normally assigned during join so that
+        #  they create a total ordering on the tree.
+        n2.partition_id = PartitionID.gen_aft(lnode.partition_id)
+
         n3.cpe = self.createCPE([
             ['a','<','girl'],
             ['c', '>', 'soft'],
             ['e','>','wish'],
             ['f','<','life']
             ])
+        n3.partition_id = PartitionID.gen_bef(lnode.partition_id)
+
+        assert NodeID.lies_between(n3.name_id, lnode.name_id, n2.name_id)
+        
+        
+
+        assert ave.get_neighbour(0,Direction.RIGHT) == n2, "why is %s first right of %s instead of %s ?"%(
+            repr(ave.get_neighbour(0,Direction.RIGHT)),lnode, n2)
+        
 
         ave.add_neighbour(1,n3)
 
-        assert ave.nb_ring<3, "how comes %s has %i rings?"%(repr(ave),ave.nb_ring)
+        #  assert ave.nb_ring<3, "how comes %s has %i rings?"%(repr(ave),ave.nb_ring)
+        #>>  there is automatic creation of one ring per 'bit' in the numeric ID. Here we
+        #>>  have used default allocation with 128-bit random identifiers
 
         rq = LookupRequest(self.createSpacePart([
             ['a','g0','g9'],
@@ -185,26 +209,43 @@ class Tester(object):
             assert hop.name_id == lnode.name_id, "forwarded msg %s should be for %s, not %s"%(
                 repr(msg), repr(lnode), repr(hop))
         
-        print("#B1: route-to-self")
+        print("#B1: route-to-self") # ... is succesful
+
+        
         rq = LookupRequest(self.createSpacePart([
             ['a','gr','gz'], # match n2: a > girl
             ['b','cx','cz'], # match n2: b> cute
             ['c','xx','xxx'],# match n2 : c>soft
             ['g','ks','ks']  # match n2 : g<talk
             ]),lnode)
+
+        left, here, right = lnode.cpe.which_side_space(rq.key, True)
+        assert not left and not here and right, "%s not going right of %s ??"%(
+            rq.key,lnode.cpe)
+        
         try:
             for i in range(1,10):
                 dests = self.__dispatch.get_destinations(RouteByCPE(rq,rq.key))
-                assert len(dests)==1, "we should have a single match in %s (i.e. %s) for %s::%s"%(
+                assert len(dests)==1, "single match expected in %s (i.e. %s) for %s::%s"%(
                     repr(dests),repr(n2),repr(rq),repr(rq.key))
+                
                 hop,msg = dests[0]
                 assert hop != None , "there should be a next hop for %s"%(repr(msg))
-                assert hop.name_id == lnode.name_id, "forwarded msg %s should be for %s, not %s"%(
-                    repr(msg), repr(lnode), repr(hop))
+                assert hop.name_id == n2.name_id, "msg %s should be for %s, not %s"%(
+                    repr(msg), repr(n2), repr(hop))
                 
+            print(repr(ave))
+            for ln in self.__dispatch.routing_trace():
+                print("##> ",ln)
+            
             print("#B2: route-to-right")
         except:
-            print(self.__dispatch.routing_trace())
+            inf=sys.exc_info()
+            print(inf[0],"\n",inf[1],"\n")
+            traceback.print_exc()
+            for ln in self.__dispatch.routing_trace():
+                print("##> ",ln)
+            print(repr(ave))
             exit(-1)
         
 

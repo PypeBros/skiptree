@@ -146,6 +146,10 @@ class Node(object):
         """Return the "Name identifier" of the Node."""
         return self.__name_id
 
+    @name_id.setter
+    def name_id(self,value):
+        self.__name_id=value
+
     @property
     def numeric_id(self):
         """Return the "Numeric identifier" of the Node."""

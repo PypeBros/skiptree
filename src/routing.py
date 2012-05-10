@@ -9,7 +9,7 @@ from equation import Component
 from equation import CPEMissingDimension
 from equation import Range
 
-# ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 
 # Module log abilities
 LOG_HANDLER = logging.StreamHandler()
@@ -19,7 +19,11 @@ LOGGER = logging.getLogger("routing")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
-# ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
+# the following algorithms work under the assumption that nodes in the tree (and
+#  neighbourhood) are sorted both on NameID and PartitionID. This is guaranteed
+#  by a sort-on-NameID insertion in neighbourhood combined with a dynamic PartitionID
+#  assignment on join.
 
 
 class RouterReflect(object):
@@ -82,6 +86,7 @@ class RouterReflect(object):
             newmsg = copy.copy(message)
             newmsg.limit=Range(local_node.partition_id,local_node.partition_id)
             dest.append((local_node, newmsg))
+
         directions = list()
         if (left):
             directions.append((Direction.LEFT,
@@ -97,20 +102,28 @@ class RouterReflect(object):
         
         for dirx, prange in directions:
             for height in range(neighbourhood.nb_ring-1,-1,-1):
-                ngh = neighbourhood.get_neighbour(dirx, height)
-                self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
-                pid = ngh.partition_id
-                if (RouterReflect.__check_position_partition_tree(dirx, lastpid, pid, local_node.partition_id)):
-                    lastpid = pid
-                    left, here, right = ngh.cpe.which_side_space(part, True)
-                    if (here or RouterReflect.__is_last(dirx, left, right)):
-                        # there should be only one next hop in each direction
-                        # it will be in charge of finding 'best nodes' if any.
-                        newmsg = copy.copy(message)
-                        newmsg.limit = prange.restrict(dirx,pid)
-                        dest.append((ngh, newmsg))
-                        break
-
+                if neighbourhood.size(dirx,height)>=1:
+                    ngh = neighbourhood.get_neighbour(dirx, height)
+                    self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
+                    pid = ngh.partition_id
+                    if (RouterReflect.__check_position_partition_tree(dirx, lastpid, pid, local_node.partition_id)):
+                        lastpid = pid
+                        left, here, right = ngh.cpe.which_side_space(part, True)
+                        if (here or RouterReflect.__is_last(dirx, left, right)):
+                            # there should be only one next hop in each direction
+                            # it will be in charge of finding 'best nodes' if any.
+                            self.__lastcall.append("%s is %s compared to %s"%(part,
+                                'here' if here else 'last',repr(ngh.cpe)))
+                            newmsg = copy.copy(message)
+                            newmsg.limit = prange.restrict(dirx,pid)
+                            dest.append((ngh, newmsg))
+                            break
+                        else:
+                            self.__lastcall.append("ignored w/ %s, %s, %s - %s"%(
+                                repr(left), repr(here), repr(right),
+                                'L' if dirx == Direction.LEFT else 'R'))
+                    else:
+                        self.__lastcall.append("%f out of partition range %s"%(pid,repr(prange)))
         return dest
                     
     #

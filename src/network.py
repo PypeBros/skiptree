@@ -292,6 +292,9 @@ class InRequestManager(asyncore.dispatcher):
         # Cleaner task
         self.cleaner = ClientChannelCleaner(self.channel_map)
 
+    def __repr__(self):
+        return '<InRequestManager %s>'%self.__address
+
     def serve_forever(self):
         """Launches the server proceeding."""
         self.bind(self.__address)

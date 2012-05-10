@@ -6,14 +6,17 @@ from nodeid import NodeID
 from util import Direction
 
 """
-Because in the SkipNet comparison are done with "NameID" and in SkipTree with "CPE", everything used 
-to route and compare should be external. The objects in this module only contains Node nothing more.
+Because in the SkipNet comparison are done with "NameID" and in SkipTree with "CPE",
+everything used to route and compare should be external. The objects in this module
+only contains Node nothing more.
 
-Even more, in SkipTree, there are some messages that must be route to more than one node. If a node
-find more than one of his neighbour involved in the request, either node must received the request.
+Even more, in SkipTree, there are some messages that must be route to more than one
+node. If a node find more than one of his neighbour involved in the request, either
+node must received the request.
 """
 
-# ------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------
 
 # Module log abilities
 LOG_HANDLER = logging.StreamHandler()
@@ -23,7 +26,7 @@ LOGGER = logging.getLogger("neighbourhood")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
-# ------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 
 class Neighbourhood(object):
     """Stores a set of pointers to neighbours nodes."""
@@ -56,6 +59,12 @@ class Neighbourhood(object):
         half_ring_set = ring_set.get_side(direction)
 
         return half_ring_set.get_closest()
+
+    def size(self, direction, ring_level):
+        """Return the closest neighbour in one direction."""
+        assert(0 <= ring_level and ring_level < self.nb_ring)
+
+        return self.__rings[ring_level].size(direction)
 
     def get_all_unique_neighbours(self):
         """Returns all unique neighbours currently in this neighbourhood."""
@@ -106,6 +115,12 @@ class RingSet(object):
 
     #
     # Properties
+
+    def size(self, direction):
+        if(direction == Direction.LEFT):
+            return self.__left.size
+        elif(direction == Direction.RIGHT):
+            return self.__right.size
 
     def get_side(self, direction):
         """Returns one of the half ring from this ring."""
@@ -176,6 +191,10 @@ class HalfRingSet(object):
     #
     # Properties
 
+    @property
+    def size(self):
+        return len(self.__neighbours)
+
     def get_closest(self):
         """Return the closest neighbour of the local node."""
         return self.__get_node(0)
@@ -240,7 +259,8 @@ class HalfRingSet(object):
                     # Remove the farthest neighbour.
                     self.__neighbours.pop()
 
-           #  for i in range(len(self.__neighbours)):
+# -- the following holds for neighbourhood controlled by skiptree join messages.
+#  for i in range(len(self.__neighbours)):
 #                 if (i!=position) :
 #                     assert self.__neighbours[i].name_id != node_to_add.name_id,"node %s already in ringset %s" % (str(node_to_add),str(self.__neighbours))
                           
