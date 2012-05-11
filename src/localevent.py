@@ -66,8 +66,11 @@ class MessageDispatcher(object):
         return self.__visitor_routing.trace
 
     def dispatch_one(self, msgcause, destinations):
+
         if destinations != None and len(destinations)>0:
             for next_hop, message in destinations:
+                message.sign("@%s: %i destinations"%(
+                    self.__local_node.partition_id,len(destinations)))
                 if(next_hop != None):
                     if(next_hop.net_info == self.__local_node.net_info):
                         message.payload.accept(self.__visitor_processing)
@@ -77,9 +80,9 @@ class MessageDispatcher(object):
                     assert False , "FIXME: Next hop == None (M: %s)"% repr(message)
         else:
             LOGGER.log(logging.DEBUG,
-                       "[DBG:%s] no destination for %s in %s" %
+                       "[DBG:%s] no destination for %s in %s \n %s" %
                        (self.__local_node.name_id,
-                        repr(msgcause), repr(self.__visitor_routing)))
+                        repr(msgcause), repr(self.__visitor_routing), repr(msgcause.trace)))
         
 
     def dispatch(self):
@@ -152,7 +155,7 @@ class RouterVisitor(VisitorRoute):
         assert (message.space_part.first_component().value != None),(
            "message %s has invalid spacepart (no component value for %s)"%
            (repr(message),repr(message.space_part.first_component())))
-        if (message.forking):
+        if (not message.forking):
             return self.__reflector.by_cpe_get_next_hop_insertion(self.__local_node, message)
         else:
             return self.__reflector.by_cpe_get_next_hop_forking(self.__local_node, message)

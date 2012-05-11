@@ -27,7 +27,7 @@ class Range(object):
     """ 
     def __init__(self, p_min=None, p_max=None, min_included=True, max_included=True, strict=True):
         if(strict and p_min!=None and p_max!=None and p_min > p_max):
-            raise ValueError("Range can't be created: the low bound exceeds high bound.")
+            raise ValueError("Range can't be created: the low bound %f exceeds high bound %f."%(p_min,p_max))
 
         self.__min = p_min
         self.__max = p_max
@@ -38,8 +38,9 @@ class Range(object):
     def restrict(self,dir, value):
         """ restricts the current range in one direction with a new cut value
             e.g. [12,20].restrict(LEFT,16) == [16,20]
+            A NEW RANGE IS RETURNED.
             """
-        r = Range(self.__min, self.__max, self.min_included, self.max_included, False )
+        r = copy.copy(self)
         if (dir==Direction.LEFT and (self.min_unbounded or r.__min<value)):
             r.__min=value
         if (dir==Direction.RIGHT and (self.max_unbounded or r.__max>value)):
@@ -153,6 +154,7 @@ class Range(object):
                 (rangeB.min_unbounded and ((rangeA.min_included and rangeB.max_included and rangeA.min <= rangeB.max) or (rangeA.min < rangeB.max))) or \
                 (rangeB.max_unbounded and ((rangeA.max_included and rangeB.min_included and rangeA.max >= rangeB.min) or (rangeA.max > rangeB.min))) or \
                 (rangeB.min >= rangeA.min and rangeB.min <= rangeA.max) or (rangeB.max <= rangeA.min and rangeB.max >= rangeA.max)
+
     def __repr__(self):
         if (self.__min == self.__max):
             return "="+str(self.__min)
@@ -966,21 +968,25 @@ the Node that delimits the area managed by the Node."""
                     left |=l ; right |=r
                     nb_here+=1
             else:
-                m_range = space_part.get_component(inode.dimension)
+                try:
+                    m_range = space_part.get_component(inode.dimension)
 
-                if(inode.is_here(m_range)):
-                    nb_here += 1
-                    left |= inode.is_more_on_the_left(m_range)
-                    right |= inode.is_more_on_the_right(m_range)
-
-                else:
-                    # The range is managed by the opposite side. @test1171706
-                    # 0_0 opposite_side = Direction.get_opposite(inode.dimension.direction)
-                    opposite_side = Direction.get_opposite(inode.direction)
-                    left |= (opposite_side == Direction.LEFT)
-                    right |= (opposite_side == Direction.RIGHT)
-                    break
-        # you need all the dimensions to say 'it's here' so that it's actually here.
+                    if(inode.is_here(m_range)):
+                        nb_here += 1
+                        left |= inode.is_more_on_the_left(m_range)
+                        right |= inode.is_more_on_the_right(m_range)
+                        
+                    else:
+                        # The range is managed by the opposite side. @test1171706
+                        # 0_0 opposite_side = Direction.get_opposite(inode.dimension.direction)
+                        opposite_side = Direction.get_opposite(inode.direction)
+                        left |= (opposite_side == Direction.LEFT)
+                        right |= (opposite_side == Direction.RIGHT)
+                        break
+                    # you need all the dimensions to say 'it's here' so that it's actually here.
+                except:
+                    raise ValueError("Component %s of %s is of unknown type: %s"%(
+                        repr(inode.dimension),repr(space_part),repr(m_range)))
         here |= (nb_here == len(self.__internal_nodes))
         assert True == left | here | right, "The request coudn't be oriented."
 

@@ -31,6 +31,10 @@ LOGGER.addHandler(LOG_HANDLER)
 class Neighbourhood(object):
     """Stores a set of pointers to neighbours nodes."""
 
+    # this approach of neighbourhood is sub-optimal, imho, in the
+    #   fact that it forces enumeration of levels where an enumeration
+    #   of (unique) neighbours would likely be enough.
+
     def __init__(self, local_node):
         self.__rings = list()
         self.__local_node = local_node

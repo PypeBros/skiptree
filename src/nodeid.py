@@ -275,21 +275,21 @@ class PartitionID(NodeID):
         it's immediate neighbour PID and the neighbour's direction in order
         to generate an appropriate (random) PID in the desired area.
         """
-    LOW, UP = PartitionID(0.0), PartitionID(1.0)
+    LOW, UP = 0.0, 1.0
 
     EPSILON = sys.float_info.epsilon
 
-    def __init__(self,v):
-        self.__v=v
+#     def __init__(self,v):
+#         self.__v=v
 
-    @property
-    def v(self):
-        return self.__v
+#     @property
+#     def v(self):
+#         return self.__v
 
     @staticmethod
     def gen():
         """Return a random 'Partition ID'."""
-        return PartitionID(PartitionID.gen_btw(PartitionID.LOW, PartitionID.UP))
+        return PartitionID.gen_btw(PartitionID.LOW, PartitionID.UP)
 
     @staticmethod
     def gen_bef(ref):
@@ -301,10 +301,10 @@ class PartitionID(NodeID):
         """Return a 'Partition ID' that resides in closed range (Lower, Upper)."""
         pick = lower
         while(pick == lower or pick == upper):
-            new_pid = random.uniform(lower.v, upper.v)
-            if (abs(new_pid - pick.v) <= PartitionID.EPSILON):
+            new_pid = random.uniform(lower, upper)
+            if (abs(new_pid - pick) <= PartitionID.EPSILON):
                 raise ValueError
-            pick = PartitionID(new_pid)
+            pick = new_pid
         return pick
 
     @staticmethod

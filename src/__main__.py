@@ -14,6 +14,7 @@ from network import InRequestManager
 from node import NetNodeInfo, Node
 from nodeid import NumericID, NameID
 from equation import SpacePart, Component, Dimension, Range
+from routing import PidRange
 
 import cProfile
 
@@ -138,10 +139,23 @@ class ThreadTalker(threading.Thread):
 
     def __find_data(self):
         keypart = eval(input())
-        #        searchpart = SpacePart(keypart.val2range())
+        # even for a point query, some forking may be required, as
+        #   we may encounter a CPE node that is defined on a dimension
+        #   that we did not provided.
+
+        # i.e. a point query is only "point" if it provides a single
+        #   (non-range) value for *all* dimensions, which we cannot
+        #   guarantee a priori.
+        
         findRQ = LookupRequest(keypart,lnode)
         print("@_@ %f - %s - %s"%(findRQ.nonce, input(),repr(keypart)))
-        lnode.route_internal(RouteByCPE(findRQ,keypart))
+        m = RouteByCPE(findRQ,keypart)
+        m.forking=True
+        p = lnode.partition_id
+        m.limit=PidRange(p-1, p+1)
+        m.trace=True
+        m.sign("leaving home")
+        lnode.route_internal(m)
 
     def __send_data(self):
         keypart = eval(input())

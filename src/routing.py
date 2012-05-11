@@ -9,7 +9,7 @@ from equation import Component
 from equation import CPEMissingDimension
 from equation import Range
 
-# ----------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # Module log abilities
 LOG_HANDLER = logging.StreamHandler()
@@ -19,11 +19,36 @@ LOGGER = logging.getLogger("routing")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
-# ----------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # the following algorithms work under the assumption that nodes in the tree (and
 #  neighbourhood) are sorted both on NameID and PartitionID. This is guaranteed
-#  by a sort-on-NameID insertion in neighbourhood combined with a dynamic PartitionID
-#  assignment on join.
+#  by a sort-on-NameID insertion in neighbourhood combined with a dynamic Parti-
+#  tionID assignment on join.
+
+class PidRange(Range):
+    def __init__(self, low, up):
+        assert low>=-1 and up<2
+        Range.__init__(self, low, up, low!=None, up!=None)
+        pass
+
+    def includes_pid(self, pid):
+        # PartitionID space is circular, but a range may never
+        #   wrap more than one circle around it. We linearize
+        #   it over -1..2 so that it's possible to express
+        #   x +- d for whatever x,d in [0..1]
+
+        # that implies testing for inclusion of p+1 when the range
+        #   overflows and testing for inclusion of p-1 when the 
+        #   range underflows.
+        if (self.includes_value(pid)):
+            return True
+        if (self.max>1 and self.includes_value(pid+1)):
+            return True
+        if (self.min<0 and self.includes_value(pid-1)):
+            return True
+        return False
+    
+        
 
 
 class RouterReflect(object):
@@ -76,6 +101,9 @@ class RouterReflect(object):
             assert False, "This should never happen !"
 
 
+
+    # applies equation-driven routing, allowing messages to be 'forked'
+    #  into sub-messages (using PidRanges)
     def by_cpe_get_next_hop_forking(self, local_node, message):
         self.__lastcall=['bycpe+f']
         dest = []
@@ -84,46 +112,69 @@ class RouterReflect(object):
             # TODO : that shouldn't be 'naked' message, but a clone with 
             #   search range that has been 'constraint' to stick here.
             newmsg = copy.copy(message)
-            newmsg.limit=Range(local_node.partition_id,local_node.partition_id)
+            newmsg.limit=PidRange(local_node.partition_id,local_node.partition_id)
             dest.append((local_node, newmsg))
+
+        # create 'directions', that identifies sub-rings to be scanned
+        #   and the sub-range of PartitionID that should be taken into account.
+
+        message.sign("routing %s%s with %s"%(
+            'L' if left else '', 'R' if right else '', repr(message.limit)))
 
         directions = list()
         if (left):
-            directions.append((Direction.LEFT,
-                               Range(None, local_node.partition_id, False,True,False)))
-        if (right):
-            directions.append((Direction.RIGHT,
-                               Range(local_node.partition_id, None, True,False,False)))
+            r = message.limit.restrict(Direction.RIGHT,local_node.partition_id)
+            directions.append((Direction.LEFT,r,'L'))
 
-        self.__lastcall.append("scanning rings "+repr(directions))
+        if (right):
+            r = message.limit.restrict(Direction.LEFT,local_node.partition_id)
+            directions.append((Direction.RIGHT,r,'R'))
+
+        self.__lastcall.append("scanning rings @%s: %s"%(
+            local_node.partition_id,repr(directions)))
         part = message.space_part
         neighbourhood = local_node.neighbourhood
-        lastpid = None
+        lastpid, lastngh = None, None
+
+        # (point) routing guideline:
+        #   for a message that must be sent in direction D, we look for
+        #   the farthest neighbour that would not reverse the travelling
+        #   direction. 
+
+        # (range) routing guideline:
+        #   you send a copy to N[i] if region between N[i] and N[i+1] inter-
+        #   sects the region you're searching for.
         
-        for dirx, prange in directions:
+        for dirx, prange, pd in directions:
             for height in range(neighbourhood.nb_ring-1,-1,-1):
-                if neighbourhood.size(dirx,height)>=1:
-                    ngh = neighbourhood.get_neighbour(dirx, height)
-                    self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
-                    pid = ngh.partition_id
-                    if (RouterReflect.__check_position_partition_tree(dirx, lastpid, pid, local_node.partition_id)):
-                        lastpid = pid
-                        left, here, right = ngh.cpe.which_side_space(part, True)
-                        if (here or RouterReflect.__is_last(dirx, left, right)):
-                            # there should be only one next hop in each direction
-                            # it will be in charge of finding 'best nodes' if any.
-                            self.__lastcall.append("%s is %s compared to %s"%(part,
-                                'here' if here else 'last',repr(ngh.cpe)))
-                            newmsg = copy.copy(message)
-                            newmsg.limit = prange.restrict(dirx,pid)
-                            dest.append((ngh, newmsg))
-                            break
-                        else:
-                            self.__lastcall.append("ignored w/ %s, %s, %s - %s"%(
-                                repr(left), repr(here), repr(right),
-                                'L' if dirx == Direction.LEFT else 'R'))
+                if neighbourhood.size(dirx,height)<1:
+                    continue # this ring is empty
+                ngh = neighbourhood.get_neighbour(dirx, height)
+                pid = ngh.partition_id
+                if ngh == lastngh:
+                    continue # we just checked this neighbour
+                lastngh=ngh
+                self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
+
+                if (prange.includes_pid(pid)):
+                    lastpid = pid
+                    left, here, right = ngh.cpe.which_side_space(part, True)
+                    if (here or RouterReflect.__goes_forward(dirx, left, right)):
+                        self.__lastcall.append(
+                            "%s is %s compared to %s"%
+                            (part, 'here' if here else 'forw', repr(ngh.cpe)))
+                        newmsg = copy.copy(message)
+                        newmsg.limit = prange.restrict(dirx,pid) # copies the range
+                        dest.append((ngh, newmsg))
                     else:
-                        self.__lastcall.append("%f out of partition range %s"%(pid,repr(prange)))
+                        self.__lastcall.append("ignored w/ %s, %s, %s - %s"%(
+                            repr(left), repr(here), repr(right),
+                            'L' if dirx == Direction.LEFT else 'R'))
+                    if (not RouterReflect.__goes_backward(dirx, left, right)):
+                        break
+                else:
+                    self.__lastcall.append("%f out of partition range %s"%
+                                           (pid,repr(prange)))
         return dest
                     
     #
@@ -148,7 +199,7 @@ class RouterReflect(object):
                     self.__lastcall.append("%s (%i,%s)"%(neighbour.pname,height,repr(dirx)))
                     neighbour_pid = neighbour.partition_id
 
-                    if(RouterReflect.__check_position_partition_tree(dirx, last_pid_checked, neighbour_pid, local_node.partition_id)):
+                    if(RouterReflect.check_position_partition_tree(dirx, last_pid_checked, neighbour_pid, local_node.partition_id)):
                         # Now, we are sure that the neighbour_pid is really smaller (higher) 
                         # than the local node one when the direction is set to LEFT (RIGHT).
                         # So, RIGHT is RIGHT and LEFT is LEFT.
@@ -197,7 +248,7 @@ class RouterReflect(object):
                     neighbour = neigbourhood.get_neighbour(direction, height)
                     neighbour_pid = neighbour.partition_id
 
-                    if(RouterReflect.__check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node.partition_id)):
+                    if(RouterReflect.check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node.partition_id)):
                         left, here, right = False, False, False
                         upper_limit = last_pid_checked
                         last_pid_checked = neighbour_pid
@@ -246,8 +297,18 @@ class RouterReflect(object):
         """
         return (direction == Direction.LEFT and left) or (direction == Direction.RIGHT and right)
 
+
     @staticmethod
-    def __check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node_pid):
+    def __goes_backward(dirx, left, right):
+        return left if dirx == Direction.RIGHT else right
+
+    @staticmethod
+    def __goes_forward(dirx, left, right):
+        return left if dirx==Direction.LEFT else right
+    
+
+    @staticmethod
+    def check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node_pid):
         """Indicates if the node is on the correct side of the partition tree."""
         if(last_pid_checked != None):
             # The last_pid_checked is defined.

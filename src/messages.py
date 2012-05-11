@@ -122,6 +122,9 @@ class RouteMessage(Visitee):
         self.__payload = payload
         self.__ttl = 16
 
+    def sign(self,line):
+        pass
+
     @property
     def ttl(self):
         return self.__ttl
@@ -227,6 +230,8 @@ class RouteByNameID(RouteMessage):
 
         self.__dst_name_id = name_id
 
+    
+
     @property
     def dest_name_id(self):
         """Return the destination "Name identifier" of the message."""
@@ -271,6 +276,22 @@ class RouteByCPE(RouteMessage):
         self.__space_part = copy.deepcopy(space_part)
         self.__limit = Range(None, None, False, False, False)
         self.__forking = False
+        self.__log = None
+
+    def sign(self, line):
+        if (self.__log!=None):
+            self.__log.append(line)
+
+    @property
+    def trace(self):
+        return self.__log
+
+    @trace.setter
+    def trace(self,v):
+        if v:
+            self.__log=[]
+        else:
+            self.__log=None
 
     @property
     def space_part(self):

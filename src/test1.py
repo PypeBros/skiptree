@@ -9,6 +9,7 @@ from node import NetNodeInfo, Node, PartitionID
 
 from messages import LookupRequest, RouteByCPE
 from localevent import MessageDispatcher
+from routing import PidRange, RouterReflect
 
 class Tester(object):
 
@@ -44,6 +45,15 @@ class Tester(object):
         lnode = self.createNode("check", '127.0.0.1')
         self.__dispatch = MessageDispatcher(lnode)
 
+
+    def resolve(self,rq):
+        route = RouteByCPE(rq,rq.key)
+        # you need to enable forking explicitly so that dispatching
+        #   and a range is required for forking.
+        route.forking=True
+        route.limit=PidRange(lnode.partition_id-.5,lnode.partition_id+.5)
+        return self.__dispatch.get_destinations(route)
+
     def test_bare_bones(self):
         left, right = Direction.get_directions(Direction.LEFT)
         assert left, "Direction.get_directions(Direction.LEFT)"
@@ -55,6 +65,11 @@ class Tester(object):
 
         assert Direction.get_opposite(Direction.LEFT) == Direction.RIGHT
         assert Direction.get_opposite(Direction.RIGHT) == Direction.LEFT
+
+        assert RouterReflect.check_position_partition_tree(
+            Direction.LEFT,None,.2,.7), "isn't it on the left ?"
+        assert RouterReflect.check_position_partition_tree(
+            Direction.RIGHT,None,.7,.2), "isn't it on the right ?"
 
         print("#0 : directions tests passed")
         return True
@@ -139,6 +154,9 @@ class Tester(object):
 
 
     def test_neighbours(self):
+        # BEWARE : this test's internal behaviour may vary depending of the nameID
+        #   and partition ID defined (randomly) when nodes are built.
+        
         ave = lnode.neighbourhood
         lid = lnode.numeric_id
         # neighbourhood is structued in rings for each skipnet level.
@@ -183,8 +201,9 @@ class Tester(object):
         
         
 
-        assert ave.get_neighbour(0,Direction.RIGHT) == n2, "why is %s first right of %s instead of %s ?"%(
-            repr(ave.get_neighbour(0,Direction.RIGHT)),lnode, n2)
+        assert ave.get_neighbour(0,Direction.RIGHT) == n2,\
+               "why is %s first right of %s instead of %s ?"%(
+                   repr(ave.get_neighbour(0,Direction.RIGHT)),lnode, n2)
         
 
         ave.add_neighbour(1,n3)
@@ -201,7 +220,7 @@ class Tester(object):
             ]),lnode)
 
         for i in range (1,10):
-            dests = self.__dispatch.get_destinations(RouteByCPE(rq,rq.key))
+            dests = self.resolve(rq)
             assert len(dests)==1, "we should have a single match in %s for %s"%(
                 repr(dests),repr(rq.payload))
             hop,msg = dests[0]
@@ -224,16 +243,15 @@ class Tester(object):
             rq.key,lnode.cpe)
         
         try:
-            for i in range(1,10):
-                dests = self.__dispatch.get_destinations(RouteByCPE(rq,rq.key))
-                assert len(dests)==1, "single match expected in %s (i.e. %s) for %s::%s"%(
-                    repr(dests),repr(n2),repr(rq),repr(rq.key))
-                
-                hop,msg = dests[0]
-                assert hop != None , "there should be a next hop for %s"%(repr(msg))
-                assert hop.name_id == n2.name_id, "msg %s should be for %s, not %s"%(
-                    repr(msg), repr(n2), repr(hop))
-                
+            dests = self.resolve(rq)
+            assert len(dests)==1, "single match expected in %s (i.e. %s) for %s::%s"%(
+                repr(dests),repr(n2),repr(rq),repr(rq.key))
+            
+            hop,msg = dests[0]
+            assert hop != None , "there should be a next hop for %s"%(repr(msg))
+            assert hop.name_id == n2.name_id, "msg %s should be for %s, not %s"%(
+                repr(msg), repr(n2), repr(hop))
+            
             print(repr(ave))
             for ln in self.__dispatch.routing_trace():
                 print("##> ",ln)
