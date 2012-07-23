@@ -132,7 +132,15 @@ class ThreadTalker(threading.Thread):
         sys.stderr.write(lnode.status+"\n")
         sys.stderr.write(lnode.cpe.__repr__())
         sys.stderr.write("\n%s\n" % lnode.name_id)
-        
+
+    def __report_status(self):
+        """used to reply to MCP's heartbeat requests"""
+        print("0_0 name=%s"% lnode.name_id)
+        print("0_0 stat="+lnode.status)
+        print("0_0 nghb="+repr(lnode.neighbourhood))
+        print("0_0 cpe="+lnode.cpe.__repr__())
+        print("#_# beat")
+        sys.stderr.write("%s replied to MCP's heartbeat"%lnode.name_id)
 
     def __dump_store(self):
         lnode.data_store.print_debug()
@@ -179,6 +187,7 @@ class ThreadTalker(threading.Thread):
         display_actions.append(("Echo value", self.__display_echo))
         display_actions.append(("Sleep", self.__sleep))
         display_actions.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
+        display_actions.append(("reply to heartbeat",self.__report_status))
 
         self.__get_action(display_actions)
 

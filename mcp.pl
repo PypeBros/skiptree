@@ -1,21 +1,22 @@
 #!/usr/bin/perl
 use Socket;
-#use Sys::Hostname;
+use IO::Handle; # for flushes
+use strict;
 
 
-$port=8086;     # first port we will try
-$lastport=8100; # port we'll stop at.
+my $port=8086;     # first port we will try
+my $lastport=8100; # port we'll stop at.
 
 socket(LISTEN, PF_INET, SOCK_STREAM, getprotobyname('tcp')) or die 'socket(t)';
 setsockopt(LISTEN, SOL_SOCKET, SO_REUSEADDR, 1);
 
-$myname = `uname -n`;
+my $myname = `uname -n`;
 chomp $myname;
-$myaddr=gethostbyname($myname);
+my $myaddr=gethostbyname($myname);
 $myaddr=inet_aton($myaddr) if length $myaddr>4;
-$TADDR =inet_ntoa($myaddr);
+my $TADDR =inet_ntoa($myaddr);
 print STDERR "$myname = $TADDR\n";
-$la = sockaddr_in($port,$myaddr);
+my $la = sockaddr_in($port,$myaddr);
 
 # --- bind them ---
 # both sockets need to be bound so that source port of advertisments is $port
@@ -27,20 +28,18 @@ welcome();
 print STDERR "BOUND AND LISTENING\n";
 open LOG, ">MCP.now" or die "you want logging on MCP.now, don't you?";
 select LOG; $|=1; select STDOUT;
-# --- file name ---
-# we are only allowed 32 bytes per advertisement message, including IP:port
-# information that is displayed on the DS. We make sure that only the filename
-# (and not the complete path) is advertised and we shorten it (keeping last 
-# characters) so that it fit the 32-bytes constraint.
-
+print LOG "BOUND AND LISTENING\n";
 
 my @ready=("$TADDR:8080");
 my @pending=();
 my $status='FREE';
 # --- the loop ---
 my $FH;
+my $who;
+
 while(1) {
   # -- if there's a pending connection, we end up here.
+  my ($remport,  $remaddr);
   eval {
     $FH=undef;
     ($remport,  $remaddr) = sockaddr_in(accept($FH,LISTEN));
@@ -50,8 +49,19 @@ while(1) {
   print STDERR "connection received from ".inet_ntoa($remaddr)."\n";
   last if !defined $FH;
   eval {
-    my $who=<$FH>;
+    $who=<$FH>;
     my @info=();
+    if ($who=~/GET/) {
+      print STDERR "EPOCH OVER\n";
+      my @ping=@ready;
+      @ready=();
+      foreach(@ready) {
+	print $_ "TYPE 0;6;\r\n";
+#	print $FH getmessage($_);
+	close $_;
+      }
+#      next;
+    }	
     if ($who=~/TRON/) {
       print $FH "END Of LINE\n";
       close $FH;
@@ -62,48 +72,65 @@ while(1) {
       close LISTEN;
       exit 0;
     }
-    chomp $who;
-    while ($d=<$FH>) {
-      last if !defined $d;
-      push @info, $d;
-      print LOG "$who - $d";
-      last if $d=~/^#_# /;
-    }
+    $who =~ s/[\r\n]+$//;
+    @info=getmessage($FH);
+    print STDERR "$#info entries : @info\n";
     if ( $status eq 'FREE' && $info[-1]=~/ READY/){
       dojoin($ready[0]);
     } elsif ($status eq 'BUSY' && $info[-1]=~/ READY/) {
-    enqueue();
+      enqueue();
     } elsif ($status eq 'BUSY' && $info[-1]=~/ CONNECTED/) {
       dequeue();
+    } elsif ($info[-1] =~ /beat/) {
+      print LOG "$who ack heartbeat\n";
     } else {
-      print STDERR "unexpected $who $info[-1] in state $status\n";
-      noop();
+      print STDERR "unexpected $who '$info[-1]' in state $status\n";
+      noop($FH);
     }
-  };
+  } ;
+  print "ERROR $@" if defined $@;
 }
 close LISTEN;
 
 exit 0;
+
+sub getmessage {
+  my @nfo=();
+  my $fh = $_[0];
+  my $d;
+  while ($d=<$fh>) {
+    print STDERR "# $d";
+    last if !defined $d;
+    next unless $d =~ /_/;
+    $d =~ s/[\r\n]+$//;
+    push @nfo, $d;
+    print LOG "$who - $d\n";
+    last if $d=~/^#_# /;
+  }
+  return @nfo;
+}
+
 
 sub dojoin {
   my ($ip,$port)=split /:/,$_[0];
   print STDERR "JOIN GRANTED ($ip:$port)\n";
   print LOG "JOIN GRANTED ($ip:$port)\n";
   print $FH "TYPE 2;$port;$ip;\r\n";
-  close $FH;
+  close $FH; # peer will come back with another connection.
   $status='BUSY';
 }
 
 sub enqueue {
-  push @pending,$FH;
+  push @pending,$FH; # we haven't replied yet.
   undef $FH;
 }
 
 sub dequeue {
   print STDERR "CONNECTION ACKNOWLEDGED $FH\n";
   print LOG "CONNECTION ACKNOWLEDGED $FH\n";
-  print $FH "TYPE 0;1\r\n";
-  close $FH;
+  print $FH "WAIT\r\n"; 
+  $FH->autoflush(1);
+  push @ready, $FH; # let's keep it for later.
   if (@pending) {
     $FH=shift @pending;
     dojoin($ready[0]);
@@ -114,8 +141,10 @@ sub dequeue {
 }
 
 sub noop {
-  print $FH "WAIT\r\n";
-  close $FH;
+  my $fh=$_[0];
+  $fh->autoflush(1);
+  print $fh "WAIT\r\n"; #  close $FH;
+  push @ready, $fh;
 }
 
 sub welcome {

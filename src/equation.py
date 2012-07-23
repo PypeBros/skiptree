@@ -43,8 +43,11 @@ class Range(object):
         r = copy.copy(self)
         if (dir==Direction.LEFT and (self.min_unbounded or r.__min<value)):
             r.__min=value
+            r.__min_included=False
+            
         if (dir==Direction.RIGHT and (self.max_unbounded or r.__max>value)):
             r.__max=value
+            r.__max_included=False
         return r
 
     #
@@ -453,17 +456,42 @@ class DataStore(object):
 
             self.__data_by_dimension[dim] = new_valCounter
 
-    def get_partition_value(self):
+    def get_partition_value(self, cpe):
         """Return a pair [best dimension, best partition value, data from left, data from right]."""
         if(len(self.__data_by_dimension) <= 0):
             raise ValueError("There isn't any data in DataStore.")
 
         # Sort the 'CompCounter' for the best split to be in first position.
         comp_counters = list(self.__data_by_dimension.values())
+
+
+        #! @HOOK@ : this is the proper place to guide the split decision
+        dims = {};
+        for d in cpe.dimensions:
+            dims[d]=cpe.get_range(d) # doesn't return a Range, just a pair of vals.
+            LOGGER.log(logging.DEBUG, "[EQN] we should keep out of %s-%s along %s"%(
+                repr(dims[d][0]), repr(dims[d][1]), d.dimension))
+
         comp_counters.sort(key=lambda val_counter: val_counter.nb_virtual)
         comp_counters.sort(key=lambda val_counter: val_counter.ratio_diff_between_side)
+        counters= []
+        for cc in comp_counters:
+            if (not cc.dimension in dims):
+                LOGGER.log(logging.DEBUG, "[EQN] %s hasn't been used yet"%(
+                    repr(cc)))
+                counters.append(cc)
+            elif (cc.redundant(dims[cc.dimension])):
+                LOGGER.log(logging.DEBUG, "[EQN] %s is redundant against %s"%(
+                    repr(cc),repr(dims[cc.dimension])))
+            else:
+                counters.append(cc)
+        
 
-        best_one = comp_counters[0]
+        # @/HOOK@
+        LOGGER.log(logging.DEBUG, "[EQN] %s preferred"%counters[0])
+        
+
+        best_one = counters[0]
 
         return [best_one.dimension, best_one.best_bound_value, best_one.data_left, best_one.data_right]
 
@@ -574,8 +602,12 @@ class CompCounter(object):
         """Return the number of values not defined for the current dimension."""
         return len(self.__virtual)
 
+    # checks whether the current proposal is redundant with a given set of CPE.
     #
-    #
+    def redundant(self, pair):
+        return (pair[0] == self.best_bound_value or
+                pair[1] == self.best_bound_value)
+
 
     def add(self, p_comp, p_data):
         """Add a component in this CompCounter."""
@@ -608,7 +640,10 @@ class CompCounter(object):
             self.__virtual.append(p_data)
 
     def __repr__(self):
-        return "<CompCounter: "+str(self.__dimension)+" "+str(self.size)+" values>"
+        if (self.__changed):
+            return "<CompCounter: "+str(self.__dimension)+" "+str(self.size)+" values, dirty>"
+        else:
+            return "<CompCounter: %s =? %s (%iv/%id)>"%(str(self.__dimension), str(self.__cut_value),self.nb_virtual,self.ratio_diff_between_side)
 
     def __compute_best_partition_value(self):
         """Return the best partition value."""

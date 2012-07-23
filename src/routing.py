@@ -41,12 +41,12 @@ class PidRange(Range):
         #   overflows and testing for inclusion of p-1 when the 
         #   range underflows.
         if (self.includes_value(pid)):
-            return True
+            return pid
         if (self.max>1 and self.includes_value(pid+1)):
-            return True
+            return pid+1
         if (self.min<0 and self.includes_value(pid-1)):
-            return True
-        return False
+            return pid-1
+        return None
     
         
 
@@ -156,20 +156,22 @@ class RouterReflect(object):
                 lastngh=ngh
                 self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
 
-                if (prange.includes_pid(pid)):
-                    lastpid = pid
+                epid=prange.includes_pid(pid) # effective pid = pid+{-1,0,+1}
+                if (epid!=None):
                     left, here, right = ngh.cpe.which_side_space(part, True)
                     if (here or RouterReflect.__goes_forward(dirx, left, right)):
                         self.__lastcall.append(
                             "%s is %s compared to %s"%
                             (part, 'here' if here else 'forw', repr(ngh.cpe)))
                         newmsg = copy.copy(message)
-                        newmsg.limit = prange.restrict(dirx,pid) # copies the range
+                        newmsg.limit = prange.restrict(Direction.get_opposite(dirx),epid)
                         dest.append((ngh, newmsg))
                     else:
                         self.__lastcall.append("ignored w/ %s, %s, %s - %s"%(
                             repr(left), repr(here), repr(right),
                             'L' if dirx == Direction.LEFT else 'R'))
+                    lastpid = pid
+                    prange = prange.restrict(dirx,pid)
                     if (not RouterReflect.__goes_backward(dirx, left, right)):
                         break
                 else:

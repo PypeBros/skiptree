@@ -523,7 +523,7 @@ class JoinProcessor(VisitorMessage):
 
         # Create the CPE.
         data_store = self.__local_node.data_store
-        [cut_dimension, cut_value, data_left, data_right] = data_store.get_partition_value()
+        [cut_dimension, cut_value, data_left, data_right] = data_store.get_partition_value(self.__local_node.cpe)
 
         # Create the CPE for the joining node.
         new_join_node = InternalNode(new_side_join, cut_dimension, cut_value)
