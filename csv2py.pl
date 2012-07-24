@@ -18,7 +18,8 @@ foreach (@Ufields) {
 foreach (@Cfields) {
   $ICMP{$_}=$i++;
 }
-
+# 0: node info menu
+# 2: turn echo off
 print "0\n2\n";
 
 $timestep = 1 if !defined $timestep;
@@ -38,6 +39,7 @@ while (<INPUT>) {
   next if !@keypart;
   $data = "['$timebase',%\s]";
   $timebase+=$timestep;
+# 1: add data
   print "1\nSpacePart([@keypart])\n$data\n";
 
   # see __main__.py
