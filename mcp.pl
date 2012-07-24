@@ -30,9 +30,13 @@ open LOG, ">MCP.now" or die "you want logging on MCP.now, don't you?";
 select LOG; $|=1; select STDOUT;
 print LOG "BOUND AND LISTENING\n";
 
-my @ready=("$TADDR:8080");
-my @pending=();
-my $status='FREE';
+
+# --- process state ---
+my $CONTACT="$TADDR:8080";   # who you should talk to.
+my @pending=();              # sockets handles waiting for processing
+my @ready=();                # sockets handles waiting for commands.
+my $status='FREE';           # turns to 'BUSY' while a peer connects.
+
 # --- the loop ---
 my $FH;
 my $who;
@@ -52,15 +56,16 @@ while(1) {
     $who=<$FH>;
     my @info=();
     if ($who=~/GET/) {
-      print STDERR "EPOCH OVER\n";
+      print STDERR "EPOCH OVER. $#ready NODES NOTIFIED\n";
       my @ping=@ready;
       @ready=();
-      foreach(@ready) {
+      foreach(@ping) {
 	print $_ "TYPE 0;6;\r\n";
+	print $FH $_;
 #	print $FH getmessage($_);
 	close $_;
       }
-#      next;
+      next; # done. We'll got replies on another channel.
     }	
     if ($who=~/TRON/) {
       print $FH "END Of LINE\n";
@@ -76,13 +81,14 @@ while(1) {
     @info=getmessage($FH);
     print STDERR "$#info entries : @info\n";
     if ( $status eq 'FREE' && $info[-1]=~/ READY/){
-      dojoin($ready[0]);
+      dojoin($CONTACT);
     } elsif ($status eq 'BUSY' && $info[-1]=~/ READY/) {
       enqueue();
     } elsif ($status eq 'BUSY' && $info[-1]=~/ CONNECTED/) {
       dequeue();
     } elsif ($info[-1] =~ /beat/) {
       print LOG "$who ack heartbeat\n";
+      noop($FH);
     } else {
       print STDERR "unexpected $who '$info[-1]' in state $status\n";
       noop($FH);
@@ -133,7 +139,7 @@ sub dequeue {
   push @ready, $FH; # let's keep it for later.
   if (@pending) {
     $FH=shift @pending;
-    dojoin($ready[0]);
+    dojoin($CONTACT);
   } else {
     print STDERR "ALL THE PROGRAMS JOINED THE GRID. EOL\n";
     $status='FREE';

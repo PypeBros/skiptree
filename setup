@@ -4,7 +4,7 @@
 alias SYN 'cat ulgple_disco.nodes | fe - " echo % ; rsync launch.pl ulgple_disco@%: &"'
 
 # launches the planetlab nodes
-alias GO 'grep -v ^# ulgple_disco.nodes | fe - "ssh ulgple_disco@% -C '"'"'killall perl ; sleep 2 ; perl launch.pl'"'"'&"'
+alias GO 'grep -v ^# ulgple_disco.nodes | fe - "ssh ulgple_disco@% -C '"'"'killall perl ; killall python3 ; sleep 2 ; perl launch.pl'"'"'&"'
 perl mcp.pl &
 
 # launches the local node.
