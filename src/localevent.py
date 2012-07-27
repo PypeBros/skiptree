@@ -438,7 +438,7 @@ class JoinProcessor(VisitorMessage):
             self.__local_node.sign("'repairing' the neighbourhood table")
             local_node_status.update_status_now()
             self.set_busy(False)
-            print("#_# Join process completed.");
+            print("0_0 -- Join process completed. --");
 
             self.__join_msg = STJoinReply(self.__local_node, STJoinReply.STATE_CONFIRM)
             route_msg = RouteDirect(self.__join_msg, message.joining_node)

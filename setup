@@ -17,3 +17,7 @@ alias SRC 'cat ulgple_disco.nodes | fe - "rsync -avz src/* ulgple_disco@%:src/ &
 alias KIK 'echo TRON | nc beetle 8086'
 
 alias STAT 'grep -v ^# ulgple_disco.nodes | fe - "ssh ulgple_disco@% -C '"'"'echo 7 > %-28080.cmd'"'"'"&'
+
+# perl csv2py.pl
+# ~/SIM/dataset/telescope/csv1/out-tsc-noampr-1226451600-001.csv.gz 1 0
+# 6000 | python3 src/__main__.py 139.165.223.18 8080 seeed 42

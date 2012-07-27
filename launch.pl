@@ -12,7 +12,7 @@ $MYSELF=0+$ARGV[0];
 $MCP_IP = "139.165.223.18";
 $MCP_PORT= 8086;
 $TRACING=''; # off
-
+system "killall python3";
 # define the local variables.
 
 $NAME=`uname -n`;

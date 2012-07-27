@@ -36,6 +36,7 @@ my $CONTACT="$TADDR:8080";   # who you should talk to.
 my @pending=();              # sockets handles waiting for processing
 my @ready=();                # sockets handles waiting for commands.
 my $status='FREE';           # turns to 'BUSY' while a peer connects.
+my $reporting=0;
 
 # --- the loop ---
 my $FH;
@@ -55,13 +56,16 @@ while(1) {
   eval {
     $who=<$FH>;
     my @info=();
+    # ---  process control commands from the user ---
     if ($who=~/GET/) {
       print STDERR "EPOCH OVER. $#ready NODES NOTIFIED\n";
+      print LOG "EPOCH OVER. $#ready NODES. ", `date`;
       my @ping=@ready;
       @ready=();
       foreach(@ping) {
 	print $_ "TYPE 0;6;\r\n";
 	print $FH $_;
+	$reporting++;
 #	print $FH getmessage($_);
 	close $_;
       }
@@ -79,6 +83,8 @@ while(1) {
     }
     $who =~ s/[\r\n]+$//;
     @info=getmessage($FH);
+
+    # --- process reports/requests from planetlab nodes ---
     print STDERR "$#info entries : @info\n";
     if ( $status eq 'FREE' && $info[-1]=~/ READY/){
       dojoin($CONTACT);
@@ -89,16 +95,21 @@ while(1) {
     } elsif ($info[-1] =~ /beat/) {
       print LOG "$who ack heartbeat\n";
       noop($FH);
+      $reporting--;
+      print STDERR "$reporting NODE REPORT(s) STILL MISSING" if $reporting;
+      print STDERR "ALL NODES HAVE REPORTED" if !$reporting
     } else {
       print STDERR "unexpected $who '$info[-1]' in state $status\n";
       noop($FH);
     }
   } ;
-  print "ERROR $@" if defined $@;
+  print STDERR "ERROR $@\n" if $@;
 }
 close LISTEN;
 
 exit 0;
+
+
 
 sub getmessage {
   my @nfo=();
