@@ -36,7 +36,8 @@ LOGGER.addHandler(LOG_HANDLER)
 # ---------------------------------------------------------------------------
 
 class MessageDispatcher(object):
-    """Dispatch messages through components of the application."""
+    """Dispatch messages through components of the application.
+    this is typically the .dispatcher of your Node object."""
 
     PRIO_MAX, PRIO_DEFAULT, PRIO_MIN = range(0, 30000, 10000)
 
@@ -65,8 +66,11 @@ class MessageDispatcher(object):
     def routing_trace(self):
         return self.__visitor_routing.trace
 
+    
     def dispatch_one(self, msgcause, destinations):
-
+        """ dispatch a list of <next_hop, message> that result in the
+            routing of msgcause. uses either localnode.sender or the
+            'processing' visitor if the message is for an app above this node."""
         if destinations != None and len(destinations)>0:
             for next_hop, message in destinations:
                 message.sign("@%s: %i destinations"%(
@@ -166,19 +170,6 @@ class RouterVisitor(VisitorRoute):
     @property
     def trace(self):
         return self.__reflector.trace
-
-##      Traceback (most recent call last):
-##  File "/usr/lib/python3.1/threading.py", line 516, in _bootstrap_inner
-##    self.run()
-##  File "src/__main__.py", line 51, in run
-##    self.__dispatcher.dispatch()
-##  File "/beetle/martin/work/DISco/skiptree-clerinx/ResumeNet/src/localevent.py", line 62, in dispatch
-##    destinations = message.accept(self.__visitor_routing)
-##  File "/beetle/martin/work/DISco/skiptree-clerinx/ResumeNet/src/messages.py", line 277, in accept
-##    return visitor.visit_RouteByCPE(self)
-##  File "/beetle/martin/work/DISco/skiptree-clerinx/ResumeNet/src/localevent.py", line 117, in visit_RouteByCPE
-##    return RouterReflect.__by_cpe_get_next_hop_insertion(self.__localnode, message)
-##NameError: global name 'RouterReflect' is not defined
 
 
 

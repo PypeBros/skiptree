@@ -137,8 +137,10 @@ class ThreadTalker(threading.Thread):
         """used to reply to MCP's heartbeat requests"""
         print("0_0 name=%s"% lnode.name_id)
         print("0_0 stat="+lnode.status)
+        print("0_0 cpe=%s"%lnode.cpe.pname)
+        for x in lnode.neighbourhood.get_all_unique_neighbours():
+            print("0_0 rtbl=%s"%x.pname)
         print("0_0 nghb="+repr(lnode.neighbourhood))
-        print("0_0 cpe="+lnode.cpe.__repr__())
         print("#_# beat")
         sys.stderr.write("%s replied to MCP's heartbeat"%lnode.name_id)
 

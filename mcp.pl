@@ -57,9 +57,9 @@ while(1) {
     $who=<$FH>;
     my @info=();
     # ---  process control commands from the user ---
-    if ($who=~/GET/) {
-      print STDERR "EPOCH OVER. $#ready NODES NOTIFIED\n";
-      print LOG "EPOCH OVER. $#ready NODES. ", `date`;
+    if ($who=~/GET ([a-z0-9A-Z]+)/) {
+      print STDERR "EPOCH $1 OVER. $#ready NODES NOTIFIED\n";
+      print LOG "EPOCH $1 OVER. $#ready NODES. ", `date`;
       my @ping=@ready;
       @ready=();
       foreach(@ping) {

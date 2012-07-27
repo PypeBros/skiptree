@@ -873,6 +873,12 @@ class InternalNode(Component):
 
         return section
 
+    @property
+    def pname(self):
+        return "(%s %s %s) "%(self.dimension,
+                            ('<' if self.__direction else '>'),
+                            self.value)
+
     # cannonical name for "toString" in python.
     def __repr__(self):
         return "(node "+Component.__repr__(self)+" "+('<' if self.__direction else '>')+")"
@@ -1060,7 +1066,7 @@ the Node that delimits the area managed by the Node."""
     def pname(self):
         m_repr = 'EQ:-'
         for inode in self.__internal_nodes:
-            m_repr += '& %s' % repr(inode)
+            m_repr += '& %s' % inode.pname
         else:
             m_repr += '/EQ'
         return m_repr
