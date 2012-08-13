@@ -264,9 +264,9 @@ class Node(object):
     # Overwritten
     @property
     def pname(self):
-        return "<Node--%i, %s :: %s>" % (
+        return "<Node--%i, %s :: %s> @ %x" % (
             self.__numeric_id, repr(self.__name_id),
-            self.cpe.pname
+            self.cpe.pname, id(self)
             )
 
     def __repr__(self):

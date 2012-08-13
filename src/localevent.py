@@ -8,6 +8,7 @@ import copy
 import logging
 import queue
 import sys
+import pdb
 
 # ResumeNet imports
 from equation import InternalNode, DataStore
@@ -66,11 +67,21 @@ class MessageDispatcher(object):
     def routing_trace(self):
         return self.__visitor_routing.trace
 
+    def flush2log(self, reason):
+        LOGGER.log(logging.WARNING,
+                   "flushing %i items of work queue: %s"% (
+                       self.__queue.qsize(),reason))
+        while(self.__queue.qsize()>0):
+            message = self.__queue.get()
+            LOGGER.log(">> %s"%repr(message))
+        
+        
     
     def dispatch_one(self, msgcause, destinations):
         """ dispatch a list of <next_hop, message> that result in the
             routing of msgcause. uses either localnode.sender or the
             'processing' visitor if the message is for an app above this node."""
+        
         if destinations != None and len(destinations)>0:
             for next_hop, message in destinations:
                 message.sign("@%s: %i destinations"%(
@@ -81,12 +92,21 @@ class MessageDispatcher(object):
                     else:
                         self.__local_node.sender.send_msg(message, next_hop)
                 else:
-                    assert False , "FIXME: Next hop == None (M: %s)"% repr(message)
+                    LOGGER.log(logging.WARNING, "FIXME: Next hop == None (M: %s)"% repr(message))
+                    pdb.set_trace()
+                    LOGGER.log(logging.WARNING, "message has been dropped")
         else:
+            report = "no destination for %s in %s --tr: %s" % (
+                repr(msgcause), repr(self.__visitor_routing), repr(msgcause.trace))
             LOGGER.log(logging.DEBUG,
-                       "[DBG:%s] no destination for %s in %s \n %s" %
-                       (self.__local_node.name_id,
-                        repr(msgcause), repr(self.__visitor_routing), repr(msgcause.trace)))
+                       "[DBG:%s] %s"%(self.__local_node.name_id,report))
+            # the >_< message is supposed to force launch.pl to stop using MCP
+            #  as STDIN feeder and ask to the terminal instead.
+            print (">_< %s"%report)
+            sys.stdout.flush()
+            pdb.set_trace()
+            print ("<_> resuming")
+            sys.stdout.flush()
         
 
     def dispatch(self):
@@ -96,10 +116,6 @@ class MessageDispatcher(object):
             message = self.__queue.get()
             self.dispatch_one(message,self.get_destinations(message))
             sys.stdout.flush()
-#             except:
-#                 # http://docs.python.org/library/sys.html#sys.exc_info
-#                 print("There is an error in the message dispatcher: ", sys.exc_info()[0], sys.exc_info())
-#             finally:
             self.__queue.task_done()
 
 # Visitor Message is handling the application-level processing,
@@ -240,7 +256,8 @@ class Router(object):
         name is the closest to the destination one but not positioned after it. By looping downward 
         in rings, name are always closer and closer to the destination name.  
         """
-        LOGGER.log(logging.DEBUG, "[DBG] Next hop from : " + local_node.__repr__())
+        LOGGER.log(logging.DEBUG, "route_by_name %s"%message)
+        message.sign("reached "+local_node.__repr__())
         neigbourhood = local_node.neighbourhood
         direction = self.by_name_get_direction(local_node.name_id, message.dest_name_id)
 
@@ -249,11 +266,12 @@ class Router(object):
             half_ring = neigbourhood.get_ring(height).get_side(direction)
             next_hop = half_ring.get_closest()
 
-            LOGGER.log(logging.DEBUG, "\tNext hop : " + next_hop.__repr__())
+            message.sign("next hop "+next_hop.__repr__())
             if (local_node != next_hop and NodeID.lies_between_direction(direction, local_node.name_id, next_hop.name_id, message.dest_name_id)):
                 # The farthest node that doesn't jump after the destination node have been found.                
                 return next_hop
-
+        
+        message.sign("that's my final destination")
         return local_node
 
     @staticmethod

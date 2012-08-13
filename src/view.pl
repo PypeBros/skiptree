@@ -3,13 +3,16 @@
 print "<html><body> @ARGV\n";
 while ($_=<>) {
   print "<hr> $_ <hr>\n" if /^EPOCH OVER/;
+  s/\@[0-9a-f]+//g;
+  s/EQ> @ [0-9a-f]+/EQ>/;
 
   # capture state about the node
   $name=$1 if /0_0 name=<NameID::(.*)>/;
   $names{$name}=$_ if /0_0 stat=/;
-  $cpe{$name}=$_ if /O_O cpe=EQ:-(.*)\/EQ$/;
+  $cpe{$name}=$_ if /0_0 cpe=EQ:-(.*)\/EQ$/;
   if (/0_0 rtbl=<Node--\d+, <NameID::([a-zA-Z0-9]+)> :: EQ:-(.*)\/EQ>$/ && length($2)>0) {
     my $other=$1; my $eqn=$2;
+    print STDERR "duplicate $name-$other declaration\n" if exists $eqn{"$name-$other"};
     $eqn=~s/&/&amp;/g;
     $eqn=~s/</&lt;/g;
     $eqn=~s/>/&gt;/g;

@@ -29,7 +29,10 @@ LOGGER.addHandler(LOG_HANDLER)
 # --------------------------------------------------------------------------------
 
 class Neighbourhood(object):
-    """Stores a set of pointers to neighbours nodes."""
+    """Stores a set of pointers to neighbours nodes.
+       Yes, that means Node objects, although less complete than the localnode.
+       (see Node::__getstate__ to see what the pickling drops)
+    """
 
     # this approach of neighbourhood is sub-optimal, imho, in the
     #   fact that it forces enumeration of levels where an enumeration
@@ -55,6 +58,7 @@ class Neighbourhood(object):
         assert(0 <= ring_level and ring_level < self.nb_ring)
         return self.__rings[ring_level]
 
+    # ultimately used by CPE routing.
     def get_neighbour(self, direction, ring_level):
         """Return the closest neighbour in one direction."""
         assert(0 <= ring_level and ring_level < self.nb_ring)
@@ -77,9 +81,9 @@ class Neighbourhood(object):
             unique_neighbours |= ring.get_all_unique_neighbours()
         return unique_neighbours
 
-    #
-    #
-
+    # see PingRequest, NeighbourhoodNet::repair_level
+    #   PING requests are for a specific ring, so we always know
+    #   which ring we should add a neighbour to.
     def add_neighbour(self, level, new_neighbour):
         """Add a neighbour in one of the ring of the neighbourhood."""
         added = False
@@ -133,6 +137,7 @@ class RingSet(object):
         elif(direction == Direction.RIGHT):
             return self.__right
 
+    # ultimately used for feeding the SNJoin process.
     def get_all_unique_neighbours(self):
         """Returns all unique neighbours currently in this ring."""
         unique_left = set(self.__left.get_neighbours())
@@ -207,6 +212,7 @@ class HalfRingSet(object):
         """Return the farthest neighbour of the local node."""
         return self.__get_node(len(self.__neighbours) - 1)
 
+
     def __get_node(self, index):
         """Return the node at a given index or the local node if that index doesn't exist."""
         upper_bound = len(self.__neighbours)
@@ -232,6 +238,7 @@ class HalfRingSet(object):
     def __try_add_neighbour(self, node_to_add):
         """Try to add a node in the neighbours of this half ring."""
         added = False
+
         #  trace = str(self.__neighbours) + "+= "+str(node_to_add)+ "\n"
         if (node_to_add != self.__local_node):
             # Find the position of the new node.
@@ -304,7 +311,8 @@ class HalfRingSet(object):
     def __repr__(self):
         rpr = str(len(self.__neighbours))+"#"
         for i in range(len(self.__neighbours)):
-            rpr += self.__neighbours[i].name_id.__repr__()
+            rpr += "%s @%x"%(self.__neighbours[i].name_id.__repr__(),
+                             id(self.__neighbours[i]))
             if (i != len(self.__neighbours) - 1):
                 rpr += ", "
                 # assert (self.__neighbours[i].name_id < self.__neighbours[i+1].name_id),"neighbours ordered."+str(i)+" "+str(self.__neighbours)+"\n"+self.__local_node.status

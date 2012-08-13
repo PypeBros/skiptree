@@ -63,7 +63,11 @@ while(1) {
       my @ping=@ready;
       @ready=();
       foreach(@ping) {
-	print $_ "TYPE 0;6;\r\n";
+	if ($1 eq 'debug') {
+	  print $_ "TYPE 8;\r\n";
+	} else {
+	  print $_ "TYPE 0;6;\r\n";
+	}
 	print $FH $_;
 	$reporting++;
 #	print $FH getmessage($_);

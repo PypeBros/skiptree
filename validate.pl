@@ -31,5 +31,8 @@ while (<>) {
       print STDERR "# $1" unless $1 eq $d;
     }
     print STDERR "0_0 partial match\n $_ -- $d\n" unless $okay == 2;
+    $valid++ if $okay==2;
   }
 }
+print STDERR ">>> $valid valid replies received.\n";
+exit 0;

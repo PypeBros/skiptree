@@ -3,6 +3,8 @@ import logging
 import sys
 import time
 import threading
+import pdb
+import os # exit
 
 # ResumeNet imports
 from localevent import MessageDispatcher
@@ -86,6 +88,7 @@ class ThreadTalker(threading.Thread):
         self.__menu.append(("check data on the skiptree.", self.__find_data))    # 5
         self.__menu.append(("Dump data store", self.__dump_store))              # 6
         self.__menu.append(("Display Current Status",self.__dump_status))       # 7
+        self.__menu.append(("Debug",self.__debug))
 
         self.uid=0
         self.portno=lnode.net_info.get_port()
@@ -103,6 +106,17 @@ class ThreadTalker(threading.Thread):
 #        time.sleep(0.5)
         while True:
             self.__get_action(self.__menu)
+
+    def __debug(self):
+        # the >_< message is supposed to force launch.pl to stop using MCP
+        #  as STDIN feeder and ask to the terminal instead.
+        print (">_< debugging")
+        sys.stdout.flush()
+        pdb.set_trace()
+        print ("<_> resuming")
+        print("#_# end-of-debug beat")
+        sys.stdout.flush()
+
 
     def __get_action(self, actions):
         index_action = 0
@@ -122,6 +136,9 @@ class ThreadTalker(threading.Thread):
                     break
                 if(choice >99):
                     time.sleep(2)
+            except EOFError:
+                sys.stderr.write("ACK: end-of-input. Terminating\n")
+                os._exit(0)
             except ValueError:
                 print("\r\n")
                 self.__interactive=True
@@ -156,7 +173,8 @@ class ThreadTalker(threading.Thread):
         # i.e. a point query is only "point" if it provides a single
         #   (non-range) value for *all* dimensions, which we cannot
         #   guarantee a priori.
-        
+        if (lnode.cpe.k<=0):
+            raise ValueError("I should have a CPE to do that %s"%lnode.cpe.pname)
         findRQ = LookupRequest(keypart,lnode)
         print("@_@ %f - %s - %s"%(findRQ.nonce, input(),repr(keypart)))
         m = RouteByCPE(findRQ,keypart)
@@ -222,8 +240,8 @@ class ThreadTalker(threading.Thread):
         print("Host (127.0.0.1):")
         host = input()
         boot_net_info = NetNodeInfo((host, port))
-
         lnode.join(boot_net_info)
+        print("Trying to join "+host+":"+str(port))
 
     def __send_leave(self):
         lnode.leave()
@@ -259,7 +277,7 @@ def main():
 
     print("NameID: ", lnode.name_id.name, sep="")
     print("NumericID: ", lnode.numeric_id.get_numeric_id_hex(), " (", int(lnode.numeric_id), ")", sep="")
-
+    
     # Create the sub-parts of the program
     th_dispatcher = ThreadDispatcher()
     threads.append(th_dispatcher)
@@ -280,21 +298,26 @@ def main():
     # Active wait unless there is no more active threads or a stopped one.        
     all_active = True
     while 0 < len(threads):
-        new_threads = list()
-        for t in threads:
-            if(t.is_alive()):
-                new_threads.append(t)
-            t.join(1)
-            all_active &= t.is_alive()
-        threads = new_threads
+        try:
+            new_threads = list()
+            for t in threads:
+                if(t.is_alive()):
+                    new_threads.append(t)
+                    t.join(1)
+                    all_active &= t.is_alive()
+                    threads = new_threads
+                    
+                    if(not all_active):
+                        LOGGER.log(logging.WARNING, "%s :All components haven't been started correctly."
+                                   %lnode.name_id.name)
+                        break
+                    
+        except KeyboardInterrupt:
+            lnode.dispatcher.flush2log("remotely killed")
+            pdb.set_trace()
 
-        if(not all_active):
-            LOGGER.log(logging.WARNING, "%s :All components haven't been started correctly."
-                       %lnode.name_id.name)
-            break
+#         exit
 
-#     except KeyboardInterrupt:
-#         pass
 
 #     except:
 #         LOGGER.log(logging.WARNING, "There is an error in the main thread: " + str(sys.exc_info()[0]))

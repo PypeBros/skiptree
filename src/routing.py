@@ -256,7 +256,12 @@ class RouterReflect(object):
                         last_pid_checked = neighbour_pid
 
                         if(RouterReflect.__is_pid_in_range(local_node.partition_id, message.limit)):
+                            if (neighbour.cpe.k<=0):
+                                LOGGER.log(logging.DEBUG, "empty CPE for %s routing %s"%(neighbour,message))
+                                pdb.set_trace()
+                                raise ValueError("empty CPE invoked in routing") 
                             left, here, right = neighbour.cpe.which_side_space(message.space_part)
+                            
 
                             if(direction == Direction.LEFT):
                                 if(here or left):

@@ -7,12 +7,14 @@
 use Socket;
 
 $MYSELF=0+$ARGV[0];
-
+$ALLARGS = join ';',@ARGV;
 ## configuration: where is the Master Control Program ?
 $MCP_IP = "139.165.223.18";
 $MCP_PORT= 8086;
 $TRACING=''; # off
-system "killall python3";
+
+
+system "killall python3 --verbose" unless $ALLARGS=~/\-\-nokill/;
 # define the local variables.
 
 $NAME=`uname -n`;
@@ -60,6 +62,13 @@ eval {
   print STDERR "[- waiting for acknowledgement -]\n";
   
   while (<DONE>) {
+    if (/^>_< /) {
+      push @report,$_;
+      debug_mode($_);
+      next;
+    }
+
+
     /^[#0]_[#0] / or next;
     print STDERR ">$NUM> $_";
     push @report,$_;
@@ -76,10 +85,11 @@ eval {
       print STDERR "[$NUM\[$NAME wait is over]]\n";
     }
     if ($commands=~/^TYPE (.*)/) {
-      chomp $1;
+      chomp $1; #\n
       print STDERR "[$NUM\[$NAME typing commands $1]]\n";
       @lines = split /;/,$1;
       foreach (@lines) {
+	next if /^\r/;
 	print CMD "$_\n";
       }
       print STDERR " done.\n";
@@ -133,4 +143,38 @@ sub wait_for_next_step {
 sub filetag {
   @t=localtime((stat($_[0]))[9]);
   return "$t[5]$t[3]$t[3].$t[2]$t[1]";
+}
+
+
+sub debug_mode {
+  my $done=0;
+  print STDERR "here starts PDB session.\n";
+  print STDERR $_[0];
+  my $fromdebug='';
+  while (!$done) {
+    my $fd;
+    # peek the first chars to detect the prompt.
+    read DONE,$fd,1 or die "lost debugging session";
+    if ($fd eq "\n") {
+      print STDERR "$fromdebug\n";
+      $fromdebug='';
+      next;
+    }
+    $fromdebug.=$fd;
+    last if $fromdebug eq '<_> ';
+    if (length $fromdebug>6) {
+      $fromdebug.=<DONE>;
+      print STDERR $fromdebug;
+      $fromdebug='';
+      next;
+    }
+    if ($fromdebug eq '(Pdb) ') {
+      print STDERR $fromdebug;
+      $todebug=<STDIN>;
+      print CMD $todebug;
+      $fromdebug='';
+      print STDERR "<$fromdebug";
+    }
+  }
+  print STDERR "debugging closed. programs goes on\n";
 }

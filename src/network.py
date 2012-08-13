@@ -5,6 +5,7 @@ import pickle
 import select
 import socket
 import time
+import pdb
 
 # ResumeNet imports
 
@@ -69,8 +70,9 @@ class NetStringTools(object):
         """Call to process a message."""
         self.__buffer = data
         l = len(data)
-        print("NET> received",l,"bytes to process")
+        # print("NET> received",l,"bytes to process")
         if (l==0):
+            pdb.set_trace()
             raise RuntimeError("connection terminated?",self)
         try:
             while self.__buffer:
@@ -340,9 +342,10 @@ class OutRequestManager(object):
     destination is usually the 'next hop' in a (hop, message pair)
     as returned by the 'routing visitor'.
         """
+        client_socket=False
         try:
-            LOGGER.log(logging.DEBUG, "%s to %s" %
-                       (repr(msg), dst_node.net_info.__repr__()))
+            #LOGGER.log(logging.DEBUG, "%s to %s" %
+            #           (repr(msg), dst_node.net_info.__repr__()))
             payload = pickle.dumps(msg)
             net_string_msg = NetStringTools().format_data(payload)
             # fix1181403
@@ -356,12 +359,13 @@ class OutRequestManager(object):
                 client_socket.sendall(net_string_msg)
             else:
                 self.node_disconnected(dst_node)
-                LOGGER.log(logging.WARNING, "-BIG ERR : Connection is not online !")
+                LOGGER.error(">_< : Connection is not online !")
                 
         except BaseException as e:
             #TOOD: Add Timeout management.            
-            print("Couldn't send",str(net_string_msg)," reason: ", e)
-        client_socket.setblocking(False)
+            LOGGER.error(">_< Couldn't send %s, reason: %s",(msg,e))
+            if (client_socket!=False):
+                client_socket.setblocking(False)
 
     def node_disconnected(self, disconnected_node):
         """Mark a node as disconnected."""

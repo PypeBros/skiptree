@@ -440,7 +440,11 @@ class SNLeaveReply(CtrlMessage):
 
 
 class SNPingRequest(CtrlMessage):
-    """SNPingRequest is used by a node to tell his existence to oder node."""
+    """SNPingRequest is used by a node to tell his existence to oder node.
+       This will cause the visited node to update its knowledge of the pinger's
+       information (e.g. CPE).
+    """
+    
 
     def __init__(self, src_node, ring_level):
         CtrlMessage.__init__(self)
@@ -867,6 +871,10 @@ class NeighbourhoodNet(object):
             side = ring.get_side(direction)
             NeighbourhoodNet.ping_half_ring(node, side, ring_level)
 
+    # TODO : the same node may be present in many rings, and we don't need it
+    #   to be ping'd so many times. 
+    #   the .NET code of skipnet simulator seems to ping the *leafset* rather
+    #   than individual rings. We may want to add that layer of bookkeeping.
     @staticmethod
     def ping_half_ring(node, half_ring, ring_level):
         """Send ping to all neighbours (telling them this node is alive)."""
