@@ -164,6 +164,7 @@ class RouterReflect(object):
                             "%s is %s compared to %s"%
                             (part, 'here' if here else 'forw', repr(ngh.cpe)))
                         newmsg = copy.copy(message)
+                        newmsg.sign("routed to %s along %s"%(ngh.pname, ngh.cpe))
                         newmsg.limit = prange.restrict(Direction.get_opposite(dirx),epid)
                         dest.append((ngh, newmsg))
                     else:
@@ -177,6 +178,7 @@ class RouterReflect(object):
                 else:
                     self.__lastcall.append("%f out of partition range %s"%
                                            (pid,repr(prange)))
+        print("0_0 %s"%repr(self))
         return dest
                     
     #

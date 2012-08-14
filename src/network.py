@@ -363,7 +363,8 @@ class OutRequestManager(object):
                 
         except BaseException as e:
             #TOOD: Add Timeout management.            
-            LOGGER.error(">_< Couldn't send %s, reason: %s",(msg,e))
+            LOGGER.error(">_< Couldn't send %s, reason: %s"%(msg,e))
+            import pdb;pdb.set_trace()
             if (client_socket!=False):
                 client_socket.setblocking(False)
 

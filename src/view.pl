@@ -1,6 +1,9 @@
 #!/usr/bin/perl
 
 print "<html><body> @ARGV\n";
+
+# collects information out of the log file.
+
 while ($_=<>) {
   print "<hr> $_ <hr>\n" if /^EPOCH OVER/;
   s/\@[0-9a-f]+//g;

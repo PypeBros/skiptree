@@ -505,10 +505,10 @@ class JoinProcessor(VisitorMessage):
         raise JoinException(message.reason)
 
     def compute_partition_id(self, message):
-        self.__local_node.sign("computing partition for joining node")
         new_side_join = Router.by_name_get_direction(self.__local_node.name_id, message.joining_node.name_id)
         next_neighbour = self.__local_node.neighbourhood.get_neighbour(new_side_join, 0)
-
+        self.__local_node.sign("computing partition for joining node %f<?<%f"%(
+            self.__local_node.partition_id,next_neighbour.partition_id))
         partition_id = 0
         if(next_neighbour != self.__local_node):
             partition_id = PartitionID.gen_btw(self.__local_node.partition_id, next_neighbour.partition_id)

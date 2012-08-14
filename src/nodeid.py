@@ -298,7 +298,10 @@ class PartitionID(NodeID):
 
     @staticmethod
     def gen_btw(lower, upper):
-        """Return a 'Partition ID' that resides in closed range (Lower, Upper)."""
+        """Return a 'Partition ID' that resides in closed range (Lower, Upper).
+           (it still works with Upper<Lower)
+        """
+        # random.uniform(2,1) happily returns a number between 1 and 2
         pick = lower
         while(pick == lower or pick == upper):
             new_pid = random.uniform(lower, upper)

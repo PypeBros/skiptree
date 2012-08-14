@@ -31,6 +31,7 @@ LOGGER = logging.getLogger("__main__")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
+
 # ----------------------------------------------------------------------------
 
 class ThreadDispatcher(threading.Thread):
@@ -94,13 +95,13 @@ class ThreadTalker(threading.Thread):
         self.portno=lnode.net_info.get_port()
         
     def run(self):
-        profiler= cProfile.Profile()
-        profiler.enable()
-        try:
+#        profiler= cProfile.Profile()
+#        profiler.enable()
+#        try:
             self.profiled()
-        finally:
-            profiler.disable()
-            profiler.print_stats("time") # ('myprofile-%d.profile' % (self.ident,))
+#        finally:
+#            profiler.disable()
+#            profiler.print_stats("time") # ('myprofile-%d.profile' % (self.ident,))
 
     def profiled(self):
 #        time.sleep(0.5)
@@ -258,12 +259,49 @@ class ThreadTalker(threading.Thread):
         lnode.route_internal(route_msg)
 
 
+def do_batch_job(host, port, filename):
+    boot_net_info=NetNodeInfo((host, int(port)))
+    lnode.join(boot_net_info)
+    LOGGER.debug("Trying to join "+host+":"+port)
+    batch = open(filename,'r')
+    
+    while (lnode.cpe.k==0):
+        time.sleep(1)
+        sys.stderr.write(".")
+
+    LOGGER.debug("reading data from "+filename)
+    while (batch):
+        keyline = batch.readline()
+        seqline = batch.readline()
+        if keyline.startswith('#') or seqline.startswith('#'):
+            break
+        keypart = eval(keyline)
+        seqno   = eval(seqline)
+        # even for a point query, some forking may be required, as
+        #   we may encounter a CPE node that is defined on a dimension
+        #   that we did not provided.
+        
+        # i.e. a point query is only "point" if it provides a single
+        #   (non-range) value for *all* dimensions, which we cannot
+        #   guarantee a priori.
+        if (lnode.cpe.k<=0):
+            raise ValueError("I should have a CPE to do that %s"%lnode.cpe.pname)
+        findRQ = LookupRequest(keypart,lnode)
+        print("@_@ %f - %s - %s"%(findRQ.nonce, seqno,repr(keypart)))
+        m = RouteByCPE(findRQ,keypart)
+        m.forking=True
+        p = lnode.partition_id
+        m.limit=PidRange(p-1, p+1)
+        m.trace=True
+        m.sign("leaving home")
+        lnode.route_internal(m)
+    LOGGER.debug("done with feeding process.")
+
 
 def main():
 
-    INDEX_LOCAL_IP, INDEX_LOCAL_PORT, INDEX_NAME_ID, INDEX_NUM_ID = range(1, 5)
+    INDEX_LOCAL_IP, INDEX_LOCAL_PORT, INDEX_NAME_ID, INDEX_NUM_ID, WELCOME_IP, WELCOME_PORT, BATCH_FILE = range(1, 8)
 
-#    try:
     threads = []
     local_address = (sys.argv[INDEX_LOCAL_IP], int(sys.argv[INDEX_LOCAL_PORT]))
 
@@ -273,6 +311,7 @@ def main():
     net_info = NetNodeInfo(local_address)
 
     global lnode
+    global batchmode
     lnode = Node(name_id, numeric_id, net_info)
 
     print("NameID: ", lnode.name_id.name, sep="")
@@ -284,9 +323,9 @@ def main():
 
     th_listener = ThreadListener(local_address, th_dispatcher.dispatcher)
     threads.append(th_listener)
-
-    th_talker = ThreadTalker()
-    threads.append(th_talker)
+    if (not batchmode):
+        th_talker = ThreadTalker()
+        threads.append(th_talker)
 
     # Launch the sub-parts of the program
     for th in threads:
@@ -294,6 +333,8 @@ def main():
             th.daemon = True
             th.start()
 
+    if (batchmode):
+        do_batch_job(sys.argv[WELCOME_IP],sys.argv[WELCOME_PORT], sys.argv[BATCH_FILE])
 
     # Active wait unless there is no more active threads or a stopped one.        
     all_active = True
@@ -360,13 +401,19 @@ class ThreadTest(threading.Thread):
 from nodeid import NameID
 
 if __name__ == "__main__":
-
+    global batchmode
+    batchmode=False
     execute_main = True
 
     if(execute_main):
-        if (len(sys.argv) != 5):
+        if (len(sys.argv) == 8):
+            batchmode=True
+            print("BATCH MODE REQUEST DETECTED")
+            main()
+        elif (len(sys.argv) != 5):
             print("-ERR : The number of argument isn't right.")
             print("*NFO : python3 __main__.py <IP_ADDRESS> <PORT_NUMBER> <NAME_ID> <NUMERIC_ID>")
+            print("          [WELCOME_IP] [WELCOME_PORT] [BATCH_FILE]");
         else:
             main()
 
