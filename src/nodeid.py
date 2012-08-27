@@ -12,22 +12,26 @@ from util import Direction
 class NodeID(object):
 
     @staticmethod
-    def lies_between_direction(direction, a, b, c):
-        """Determine if b is located between a and c, when going in some direction."""
+    def lies_between_direction(direction, a, b, c, wrap):
+        """Determine if b is located between a and c, when going in some direction.
+        'wrap' is a bool that indicate whether wrapping is allowed between a and c."""
         if(direction == Direction.LEFT):
-            return NodeID.lies_between(c, b, a)
+            return NodeID.lies_between(c, b, a,wrap)
         else:
-            return NodeID.lies_between(a, b, c)
+            return NodeID.lies_between(a, b, c,wrap)
 
     @staticmethod
-    def lies_between(a, b, c):
+    def lies_between(a, b, c, wrap):
         """Determine if b is located between a and c."""
         # Theses cases should return True
         # 1) ***[a---b---c]***
-        # 2) ---b---c]***[a--- 
-        # 3) ---c]***[a---b--- 
+        # 2) ---b---c]***[a--- implies (a) can wrap to (b) <=> a-c wrap exists
+        # 3) ---c]***[a---b--- implies (b) can wrap to (c) <=> a-c wrap exists
         # 4) ----c==a----b----
-        return (a < b and b < c) or (b < c and c < a) or (c < a and a < b) or (c == a)
+        return (a < b and b < c) or \
+               (wrap and b < c and c < a) or \
+               (wrap and c < a and a < b) or \
+               (c == a)
 
 
 class NameID(NodeID):

@@ -35,6 +35,8 @@ LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
 # ---------------------------------------------------------------------------
+# lnode.dispatcher._MessageDispatcher__visitor_routing.debugging=31
+# lnode.dispatcher._MessageDispatcher__visitor_processing._ProcessorVisitor__join_processor.debugging=True
 
 class MessageDispatcher(object):
     """Dispatch messages through components of the application.
@@ -123,16 +125,21 @@ class MessageDispatcher(object):
 class DatastoreProcessor(object):
     def __init__(self, node):
         self.__local_node = node
+        self.debugging=False
 
     def insertData(self, message):
         """ expect message ISA InsertionRequest """
         print(message," has reached ",self.__local_node)
+        if (self.debugging):
+            import pdb; pdb.set_trace()
         ### XXX test the message.key matches by local CPEs.
         self.__local_node.data_store.add(message.key, message.data)
 
     def lookupData(self, message):
         """ expect message ISA LookupRequest """
         print(message," has reached ",self.__local_node)
+        if (self.debugging):
+            import pdb; pdb.set_trace()
         values = self.__local_node.data_store.get(message.key)
         reply = LookupReply(values, message.nonce)
         route = RouteDirect(reply, message.originator)
@@ -142,6 +149,9 @@ class DatastoreProcessor(object):
         """ expect message ISA LookupReply """
         values = message.data
         print("!_! %f - %s" % (message.nonce,repr(values)))
+        if (self.debugging):
+            import pdb; pdb.set_trace()
+
 
 # ------------------------------------------------------------------------------------------------
 
@@ -153,20 +163,29 @@ class RouterVisitor(VisitorRoute):
         self.__local_node = local_node
         self.__router = Router(local_node)
         self.__reflector = RouterReflect()
+        self.debugging=0
 
     # Every method in this class should return a list of pair (destination, message)
     # The destination is a class 'Node' and the message is a (sub)class of 'RouteMessage'.
 
     def visit_RouteDirect(self, message):
+        if (self.debugging&1):
+            import pdb; pdb.set_trace()
         return self.__router.route_directly(message)
 
     def visit_RouteByNameID(self, message):
+        if (self.debugging&2):
+            import pdb; pdb.set_trace()
         return self.__router.route_by_name(message)
 
     def visit_RouteByNumericID(self, message):
+        if (self.debugging&4):
+            import pdb; pdb.set_trace()
         return self.__router.route_by_numeric(message)
 
     def visit_RouteByPayload(self, message):
+        if (self.debugging&8):
+            import pdb; pdb.set_trace()
         return message.route(self.__local_node)
 
     def visit_RouteByCPE(self, message):
@@ -175,6 +194,8 @@ class RouterVisitor(VisitorRoute):
         assert (message.space_part.first_component().value != None),(
            "message %s has invalid spacepart (no component value for %s)"%
            (repr(message),repr(message.space_part.first_component())))
+        if (self.debugging&16):
+            import pdb; pdb.set_trace()
         if (not message.forking):
             return self.__reflector.by_cpe_get_next_hop_insertion(self.__local_node, message)
         else:
@@ -251,15 +272,18 @@ class Router(object):
 
     def __by_name_get_next_hop(self, local_node, message):
         """Return the next hop to witch send the message (in a route by name id).
-        
-        Nodes in a ring are sorted by name. The principle is to inspect a ring and find a node whose
-        name is the closest to the destination one but not positioned after it. By looping downward 
-        in rings, name are always closer and closer to the destination name.  
+        Nodes in a ring are sorted by name. The principle is to inspect a ring and
+        find a node whose name is the closest to the destination one but not positioned
+        after it. By looping downward in rings, name are always closer and closer to
+        the destination name.  
         """
         LOGGER.log(logging.DEBUG, "route_by_name %s"%message)
         message.sign("reached "+local_node.__repr__())
         neigbourhood = local_node.neighbourhood
-        direction = self.by_name_get_direction(local_node.name_id, message.dest_name_id)
+        ln = local_node.name_id
+        dn = message.dest_name_id
+        direction = self.by_name_get_direction(ln, dn)
+        canwrap = neighbourhood.can_wrap(direction)
 
         # Loop from the highest ring to the smallest one. 
         for height in range(neigbourhood.nb_ring - 1, -1, -1):
@@ -267,7 +291,8 @@ class Router(object):
             next_hop = half_ring.get_closest()
 
             message.sign("next hop "+next_hop.__repr__())
-            if (local_node != next_hop and NodeID.lies_between_direction(direction, local_node.name_id, next_hop.name_id, message.dest_name_id)):
+            if (local_node != next_hop and
+                NodeID.lies_between_direction(direction, ln, next_hop.name_id, dn, canwrap)):
                 # The farthest node that doesn't jump after the destination node have been found.                
                 return next_hop
         
@@ -380,6 +405,7 @@ class JoinProcessor(VisitorMessage):
     def __init__(self, node):
         self.__local_node = node
         self.__reset_join_state()
+        self.debugging=0
 
     def __reset_join_state(self):
         """Reset the state of the JoinProcessor."""
@@ -405,6 +431,8 @@ class JoinProcessor(VisitorMessage):
     def visit_STJoinRequest(self, message):
         # runs in the welcoming node, upon Join Request message.
         print("0_0 visit_STJoinRequest, phase=",str(message.phase))
+        if (self.debugging&1):
+            import pdb; pdb.set_trace()
 
         if(message.phase == STJoinRequest.STATE_ASK):
             # A new node would like to join the network.
@@ -464,6 +492,8 @@ class JoinProcessor(VisitorMessage):
     def visit_STJoinReply(self, message):
         ## running on the newborn node, if the welcoming node can welcome us.
         print("0_0 visit_STJoinReply, phase=",str(message.phase))
+        if (self.debugging&2):
+            import pdb; pdb.set_trace()
 
         if(message.phase == STJoinReply.STATE_PROPOSE):
             self.__local_node.sign("join proposition received "+str(message.contact_node))
@@ -593,6 +623,9 @@ class JoinProcessor(VisitorMessage):
 
     def visit_SNJoinReply(self, message):
         LOGGER.log(logging.DEBUG, "[DBG] SNJoinReply - Process")
+        if (self.debugging&4):
+            import pdb; pdb.set_trace()
+
         NeighbourhoodNet.repair_level(self.__local_node, self.__local_node.neighbourhood, 0, message.neightbours)
 
         # The contact node for SkipTree is the left or right neighbour.

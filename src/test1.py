@@ -152,6 +152,72 @@ class Tester(object):
         print("#A4 : incomplete space-part")
         return cpe
 
+    def test_ring(self):
+        j=0
+        nd=[]
+        for n,i in (("g3",45),("jt",71),("na",53),("se",42),("sw",59),("xk",19)):
+            nd+=[self.createNode(n,"127.0.0.1%i"%j)]
+            nd[j].numeric_id=i     
+            j=j+1
+            
+        import copy
+        from equation import InternalNode
+        from util import Direction
+        
+        import pdb; pdb.set_trace()
+        cut_dim=("a","b","a","x","c")
+        cut_val=("girl","soft","cute","c","face")
+        
+        from localevent import Router
+        for i in (1, 0, 4, 2):
+            nb = nd[3].neighbourhood
+            side=Router.by_name_get_direction(nd[3].name_id,nd[i].name_id)
+            nextn =  nb.get_neighbour(side,0)
+            othern= nb.get_neighbour(not side,0)
+            wrapf = nb.can_wrap(side)
+            wrapb = nb.can_wrap(not side)
+            
+            assert(
+                NodeID.lies_between_direction(side,nd[3].name_id,nd[i].name_id,nextn.name_id,wrapf)
+                or
+                NodeID.lies_between_direction(not side,nd[3].name_id,nd[i].name_id,othern.name_id,wrapb)
+                )
+
+            if (not NodeID.lies_between_direction(side,nd[3].name_id,nd[i].name_id,nextn.name_id, wrapf)):
+                print("need to reverse side %s-%s-%s!"%(nd[3].name_id,nd[i].name_id,nextn.name_id))
+                side=not side
+                nextn=othern
+                        
+            print("next on %s is %s"%("LEFT" if side else "RIGHT",repr(nextn)))
+
+            nb.add_neighbour(0,nd[i])
+            if (nd[i].numeric_id>=32):
+                nb.add_neighbour(1,nd[i])
+            if (nd[i].numeric_id<48):
+                nb.add_neighbour(2,nd[i])
+            if (nd[i].numeric_id>40):
+                nb.add_neighbour(3,nd[i])
+            if (nd[i].numeric_id<44):
+                nb.add_neighbour(4,nd[i])
+            if (nd[i].numeric_id>=42):
+                nb.add_neighbour(5,nd[i])
+
+            new_side_join = side
+            new_side_local= Direction.get_opposite(new_side_join)
+
+            njnode=InternalNode(new_side_join,cut_dim[i],cut_val[i])
+            njcpe =copy.deepcopy(nd[3].cpe)
+            njcpe.add_node(njnode)
+            print("%s gets CPE %s"%(nd[i].pname,njcpe))
+
+            nlnode=InternalNode(new_side_local,cut_dim[i],cut_val[i])
+            nlcpe =copy.deepcopy(nd[3].cpe)
+            nlcpe.add_node(nlnode)
+            print("%s gets CPE %s"%(nd[3].pname,nlcpe))
+            nd[i].cpe=njcpe
+            nd[3].cpe=nlcpe
+            
+
 
     def test_neighbours(self):
         # BEWARE : this test's internal behaviour may vary depending of the nameID
@@ -197,7 +263,7 @@ class Tester(object):
             ])
         n3.partition_id = PartitionID.gen_bef(lnode.partition_id)
 
-        assert NodeID.lies_between(n3.name_id, lnode.name_id, n2.name_id)
+        assert NodeID.lies_between(n3.name_id, lnode.name_id, n2.name_id, False)
         
         
 
@@ -276,4 +342,6 @@ lnode.cpe = t.test_open_split()
 
 print("*-- testing routing --*")
 t.test_neighbours()
+
+t.test_ring()
 exit

@@ -90,7 +90,8 @@ class ThreadTalker(threading.Thread):
         self.__menu.append(("Dump data store", self.__dump_store))              # 6
         self.__menu.append(("Display Current Status",self.__dump_status))       # 7
         self.__menu.append(("Debug",self.__debug))
-
+        self.debugging=False # turn this to true if you intend to debug SOME OTHER
+        # thread
         self.uid=0
         self.portno=lnode.net_info.get_port()
         
@@ -124,14 +125,17 @@ class ThreadTalker(threading.Thread):
         while True:
             try:
                 choice = -1
-                if (self.__interactive):
+                if (self.__interactive and not self.debugging):
                     print("\r\nWhich action do you want to do ?")
                     for i in range(len(actions)):
                         print("  ", i, ". ", actions[i][0], sep="")
-                inp=input()
-                if (inp == 'q'):
-                    sys.exit(0)
-                choice = int(inp)
+                if (not self.debugging):
+                    inp=input()
+                    if (inp == 'q'):
+                        sys.exit(0)
+                    choice = int(inp)
+                else:
+                    time.sleep(30)
                 if(0 <= choice and choice < len(actions)):
                     index_action = choice
                     break

@@ -151,6 +151,9 @@ class RouteDirect(RouteMessage):
 
         self.__dst_node = dst_node
 
+    def __repr__(self):
+        return "<RDirect: %s to %s>"%(self.payload,self.__dst_node)
+
     @property
     def destination(self):
         """Return the destination of the direct message."""
@@ -172,6 +175,10 @@ class RouteByNumericID(RouteMessage):
         self.__start_node = None
         self.__ring_level = -1
         self.__final_destination = False
+
+    def __repr__(self):
+        return "<RNumeric: %s to %s>"%(self.payload,str(self.__dst_num_id))
+
 
     @property
     def dest_num_id(self):
@@ -230,7 +237,8 @@ class RouteByNameID(RouteMessage):
 
         self.__dst_name_id = name_id
 
-    
+    def __repr__(self):
+        return "<RNameID: %s to %s>"%(self.payload,self.__dst_name_id)
 
     @property
     def dest_name_id(self):
@@ -255,6 +263,9 @@ class RouteByPayload(RouteMessage):
 
         self._state = self.STATE_ROUTING
 
+    def __repr__(self):
+        return "<RPayload %s>"%self.payload
+
     @property
     def routing(self):
         """Return True if the RouteByPayload message is in his routing phase."""
@@ -277,6 +288,9 @@ class RouteByCPE(RouteMessage):
         self.__limit = Range(None, None, False, False, False)
         self.__forking = False
         self.__log = None
+
+    def __repr__(self):
+        return "<RCPE %s to %s>"%(repr(self.payload),repr(self.__space_part))
 
     def sign(self, line):
         if (self.__log!=None):
@@ -325,8 +339,6 @@ class RouteByCPE(RouteMessage):
         else:
             return None
 
-    def __repr__(self):
-        return "<byCPE::%s>"%repr(self.payload)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -492,58 +504,64 @@ class SNFixupHigher(RouteByPayload, CtrlMessage):
         return [(self.__towards_highest_ring_next_hop(local_node), self)]
 
     def __towards_highest_ring_next_hop(self, local_node):
+        d = self.__direction
+        l = self.__ring_level
         if (self.__first_hop):
             self.__first_hop = False
 
             # Find the closest neighbour in this level and direction.
             neighbourhood = local_node.neighbourhood
-            neighbour = neighbourhood.get_neighbour(self.__direction, self.__ring_level)
+            neighbour = neighbourhood.get_neighbour(d , l)
 
             if (neighbour == local_node):
                 # The message must not be routed.
                 return None
             else:
-                LOGGER.log(logging.DEBUG, "[DBG] " + self._info() + "Route")
+                LOGGER.debug( "[DBG] " + self._info() + "Route")
                 return neighbour
 
-        LOGGER.log(logging.DEBUG, "[DBG] " + self._info() + "Route")
+        LOGGER.debug( "[DBG] " + self._info() + "Route")
 
         self.__nb_hops = self.__nb_hops + 1
 
         if (self.__complete or self.__src_node == local_node):
             # The ring have been traversed or the best node have been found.
-            LOGGER.log(logging.DEBUG, "[DBG] The ring have been traversed or the best node have already been found.")
+            LOGGER.debug( "[DBG] The ring have been traversed or the best node have already been found.")
             self._state = self.STATE_PAYLOAD
             return self.__src_node
 
         common_height = self.__src_node.numeric_id.get_longest_prefix_length(local_node.numeric_id)
-        if (common_height > self.__ring_level):
+        if (common_height > l):
             # One of the best node of the ring have been found.
             self.__complete = True
-            self.__neighbours = local_node.neighbourhood.get_ring(self.__ring_level + 1).get_all_unique_neighbours()
-            LOGGER.log(logging.DEBUG, "[DBG] One of the best node of the ring have been found.")
-            LOGGER.log(logging.DEBUG, "[DBG] " + self.__neighbours.__repr__())
+            self.__neighbours = local_node.neighbourhood.get_ring(l + 1).get_all_unique_neighbours()
+            LOGGER.debug("[DBG] One of the best node of the ring have been found.")
+            LOGGER.debug("[DBG] " + self.__neighbours.__repr__())
             return self.__src_node
 
-        next_hop = local_node.neighbourhood.get_neighbour(self.__direction, self.__ring_level)
+        next_hop = local_node.neighbourhood.get_neighbour(d, l)
+        canwrap  = local_node.neighbourhood.can_wrap(d)
+        (ln,nn) = (local_node.name_id, next_hop.name_id)
         if(next_hop == local_node or \
-           NodeID.lies_between_direction(self.__direction, local_node.name_id, self.__src_node.name_id, next_hop.name_id)):
+           NodeID.lies_between_direction(d, ln, self.__src_node.name_id, nn, canwrap)):
             # The ring only contains the local node or the right ring position have been found.
-            LOGGER.log(logging.DEBUG, "[DBG] The ring only contains the local node or have been half traversed.")
+            LOGGER.debug("[DBG] The ring only contains the local node or have been half traversed.")
             self.__complete = True
             return self.__src_node
         else:
             # The source node isn't a direct neighbour of the local node. Send to the next hop.
-            LOGGER.log(logging.DEBUG, "[DBG] Send to the next hop.")
+            LOGGER.debug("[DBG] Send to the next hop.")
             return next_hop
+    
+
 
     def process(self, local_node):
-        LOGGER.log(logging.DEBUG, "[DBG] " + self._info() + "Process")
+        LOGGER.debug( "[DBG] " + self._info() + "Process")
         if(self.__neighbours != None and 0 < len(self.__neighbours)):
             # This only happens if a node with at least one more common level have been found.
             NeighbourhoodNet.repair_level(local_node, local_node.neighbourhood, self.__ring_level + 1, self.__neighbours)
         else:
-            LOGGER.log(logging.DEBUG, "[DBG] " + self._info() + "Stop")
+            LOGGER.debug( "[DBG] " + self._info() + "Stop")
 
     def _info(self):
         return "SNFixupHigher (" + str(self.__ring_level) + ", " + Direction.get_name(self.__direction) + ") - (" + str(self.__nb_hops) + ") - "
@@ -819,6 +837,8 @@ class EncapsulatedMessage(AppMessage):
 
     def accept(self, visitor):
         visitor.visit_EncapsulatedMessage(self)
+    def __repr__(self):
+        return "<Encapsulated: %s>"%self.encapsulated_message
 
 # ------------------------------------------------------------------------------------------------
 
@@ -831,7 +851,7 @@ class NeighbourhoodNet(object):
         
         The new inserted nodes could be propagated to higher levels.
         """
-        LOGGER.log(logging.DEBUG, "[DBG] Repair level: " + str(ring_level) + " with " + str(len(neighbours)) + " neighbours (" + str(neighbours) + ")")
+        LOGGER.debug( "[DBG] Repair level: " + str(ring_level) + " with " + str(len(neighbours)) + " neighbours (" + str(neighbours) + ")")
 
         ring = neighbourhood.get_ring(ring_level)
         left = ring.get_side(Direction.LEFT)
@@ -880,7 +900,7 @@ class NeighbourhoodNet(object):
         """Send ping to all neighbours (telling them this node is alive)."""
         neighbours = half_ring.get_neighbours()
         for neighbour in neighbours:
-            LOGGER.log(logging.DEBUG, "[DBG] Send a Ping to: " + neighbour.__repr__())
+            LOGGER.debug( "[DBG] Send a Ping to: " + neighbour.__repr__())
 
             payload_msg = SNPingRequest(node, ring_level)
             route_msg = RouteDirect(payload_msg, neighbour)

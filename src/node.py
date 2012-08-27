@@ -154,6 +154,9 @@ class Node(object):
     def numeric_id(self):
         """Return the "Numeric identifier" of the Node."""
         return self.__numeric_id
+    @numeric_id.setter
+    def numeric_id(self,value):
+        self.__numeric_id=value
     
     @property
     def partition_id(self):
