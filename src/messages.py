@@ -854,13 +854,15 @@ class NeighbourhoodNet(object):
         LOGGER.debug( "[DBG] Repair level: " + str(ring_level) + " with " + str(len(neighbours)) + " neighbours (" + str(neighbours) + ")")
 
         ring = neighbourhood.get_ring(ring_level)
+        wrap_left = neighbourhood.can_wrap(Direction.LEFT)
+        wrap_right= neighbourhood.can_wrap(Direction.RIGHT)
         left = ring.get_side(Direction.LEFT)
         right = ring.get_side(Direction.RIGHT)
 
         added_left, added_right = False, False
         for new_node in neighbours:
-            added_left |= left.add_neighbour(new_node)
-            added_right |= right.add_neighbour(new_node)
+            added_left |= left.add_neighbour(new_node, wrap_left) 
+            added_right |= right.add_neighbour(new_node, wrap_right)
 
         sides = ((Direction.LEFT, added_left, left), (Direction.RIGHT, added_right, right))
         for direction, added, half_ring in sides:

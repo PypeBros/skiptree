@@ -279,15 +279,15 @@ class Router(object):
         """
         LOGGER.log(logging.DEBUG, "route_by_name %s"%message)
         message.sign("reached "+local_node.__repr__())
-        neigbourhood = local_node.neighbourhood
+        neighbourhood = local_node.neighbourhood
         ln = local_node.name_id
         dn = message.dest_name_id
         direction = self.by_name_get_direction(ln, dn)
         canwrap = neighbourhood.can_wrap(direction)
 
         # Loop from the highest ring to the smallest one. 
-        for height in range(neigbourhood.nb_ring - 1, -1, -1):
-            half_ring = neigbourhood.get_ring(height).get_side(direction)
+        for height in range(neighbourhood.nb_ring - 1, -1, -1):
+            half_ring = neighbourhood.get_ring(height).get_side(direction)
             next_hop = half_ring.get_closest()
 
             message.sign("next hop "+next_hop.__repr__())
