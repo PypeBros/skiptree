@@ -558,8 +558,10 @@ class JoinProcessor(VisitorMessage):
             
             if(not NodeID.lies_between_direction(not side, lname, jname, othern.name_id, wrapb)):
                 LOGGER.debug("?_? node %s shouldn't have received %s ?_?"%(
-                    ln,message))
+                    ln,message.trace))
+                print(">_< debugging")
                 import pdb; pdb.set_trace()
+                print("<_> resuming")
         
             side = not side
             nextn= othern
@@ -654,28 +656,31 @@ class JoinProcessor(VisitorMessage):
 
 
     def visit_SNJoinReply(self, message):
+        ln = self.__local_node
         LOGGER.log(logging.DEBUG, "[DBG] SNJoinReply - Process")
         if (self.debugging&4):
             import pdb; pdb.set_trace()
 
-        NeighbourhoodNet.repair_level(self.__local_node, self.__local_node.neighbourhood, 0, message.neightbours)
+        NeighbourhoodNet.repair_level(ln, ln.neighbourhood, 0, message.neightbours)
 
         # The contact node for SkipTree is the left or right neighbour.
-        node_left = self.__local_node.neighbourhood.get_neighbour(Direction.LEFT, 0)
-        node_right = self.__local_node.neighbourhood.get_neighbour(Direction.RIGHT, 0)
+        node_left = ln.neighbourhood.get_neighbour(Direction.LEFT, 0)
+        node_right = ln.neighbourhood.get_neighbour(Direction.RIGHT, 0)
 
-        psl = self.__local_node.name_id.get_longest_prefix_length(node_left.name_id)
-        psr = self.__local_node.name_id.get_longest_prefix_length(node_right.name_id)
+        psl = ln.name_id.get_longest_prefix_length(node_left.name_id)
+        psr = ln.name_id.get_longest_prefix_length(node_right.name_id)
+        # Launch the SkipTree joining.
+        payload_msg = STJoinRequest(ln, STJoinRequest.STATE_ASK)
+        payload_msg.sign("%s joint SN. Candidates for ST are %s:%f or %s:%f"%(
+            ln.name_id, node_left.name_id, psl, node_right.name_id, psr))
 
         contact_node = node_left
         print("0_0 %s@%f -vs- %s@%f"%(node_left, psl, node_right, psr));
         if(psl < psr):
             contact_node = node_right
-        self.__local_node.sign("joint the skipnet")
-        
-        # Launch the SkipTree joining.
-        payload_msg = STJoinRequest(self.__local_node, STJoinRequest.STATE_ASK)
-        print("0_0 joining the skiptree ",payload_msg)
+        ln.sign("joint the skipnet")
+        payload_msg.sign("prefered %s"%contact_node.name_id)
+        print("0_0 joining the skiptree : %s->%s",ln.name_id, contact_node.name_id)
         route_msg = RouteDirect(payload_msg, contact_node)
-        self.__local_node.route_internal(route_msg)
+        ln.route_internal(route_msg)
 

@@ -72,6 +72,8 @@ class ThreadListener(threading.Thread):
             LOGGER.log(logging.ERROR, "The listener coudn't be started for %s." %
                        repr(self.__listener.address))
 
+# from __main__ import ThreadTalker; ThreadTalker.instance.debugging=True
+#  ^ type this at (pdb) prompt to disengage interactive polling for input.
 class ThreadTalker(threading.Thread):
     instance=None
     def __init__(self):

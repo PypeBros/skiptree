@@ -91,10 +91,8 @@ class Neighbourhood(object):
     def add_neighbour(self, level, new_neighbour):
         """Add a neighbour in one of the ring of the neighbourhood."""
         added = False
-        wrapleft = self.can_wrap(Direction.LEFT)
-        wrapright= self.can_wrap(Direction.RIGHT)
         if(0 <= level and level < len(self.__rings)):
-            added = self.__rings[level].add_neighbour(new_neighbour, wrapleft, wrapright)
+            added = self.__rings[level].add_neighbour(new_neighbour)
         return added
 
     def remove_neighbour(self, old_neighbour):
@@ -174,11 +172,11 @@ class RingSet(object):
     #
     #
 
-    def add_neighbour(self, new_neighbour, wl, wr):
+    def add_neighbour(self, new_neighbour):
         """Adds a node to this ring."""
         added = False
-        added |= self.__left.add_neighbour(new_neighbour, wl)
-        added |= self.__right.add_neighbour(new_neighbour, wr)
+        added |= self.__left.add_neighbour(new_neighbour)
+        added |= self.__right.add_neighbour(new_neighbour)
 
         return added
 
@@ -249,15 +247,14 @@ class HalfRingSet(object):
     #
     #
 
-    def add_neighbour(self, new_neighbour, wrapping):
+    def add_neighbour(self, new_neighbour):
         """Add a neighbour in this half ring."""
-        return self.__try_add_neighbour(new_neighbour, wrapping)
+        return self.__try_add_neighbour(new_neighbour)
 
-    def __try_add_neighbour(self, node_to_add, wrapping):
+    def __try_add_neighbour(self, node_to_add):
         """Try to add a node in the neighbours of this half ring."""
         added = False
 
-        #  trace = str(self.__neighbours) + "+= "+str(node_to_add)+ "\n"
         if (node_to_add != self.__local_node):
             # Find the position of the new node.
             prev = self.__local_node
@@ -273,7 +270,7 @@ class HalfRingSet(object):
                     self.__neighbours[i] = node_to_add
                     return False
                 else:
-                    if(self.__lies_between(prev, node_to_add, current, wrapping)):
+                    if(self.__lies_between(prev, node_to_add, current)):
                         position = i
                         break
 
@@ -296,10 +293,13 @@ class HalfRingSet(object):
 
         return added
 
-    def __lies_between(self, node_a, node_b, node_c, wrap):
-        """Determine if b is located between a and c, when going in some direction."""
+    def __lies_between(self, node_a, node_b, node_c):
+        """Determine if b is located between a and c, when going in some direction.
+           a and c are assumed to be already direction-sorted, so if they wrap,
+           b can wrap. If not, do not insert a new wrap.
+        """
         a, b, c = node_a.name_id, node_b.name_id, node_c.name_id
-        
+        wrap = (a>c) if self.__direction==Direction.RIGHT else (a<c)
         return NodeID.lies_between_direction(self.__direction, a, b, c, wrap)
 
     def remove_neighbour(self, old_neighbour):

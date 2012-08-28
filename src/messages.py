@@ -362,10 +362,27 @@ class CtrlMessage(Message):
 
     def __init__(self):
         Message.__init__(self)
+        self.__log=[]
 
     def process(self, local_node):
         """This function will be executed by each node that receive it."""
         pass
+
+    def sign(self, line):
+        if (self.__log!=None):
+            self.__log.append(line)
+
+    @property
+    def trace(self):
+        return self.__log
+
+    @trace.setter
+    def trace(self,v):
+        if v:
+            self.__log=[]
+        else:
+            self.__log=None
+
 
 # ------------------------------------------------------------------------------------------------
 
@@ -463,6 +480,22 @@ class SNPingRequest(CtrlMessage):
 
         self.__src_node = src_node
         self.__ring_level = ring_level
+
+    def sign(self, line):
+        if (self.__log!=None):
+            self.__log.append(line)
+
+    @property
+    def trace(self):
+        return self.__log
+
+    @trace.setter
+    def trace(self,v):
+        if v:
+            self.__log=[]
+        else:
+            self.__log=None
+
 
     @property
     def src_node(self):
@@ -854,15 +887,15 @@ class NeighbourhoodNet(object):
         LOGGER.debug( "[DBG] Repair level: " + str(ring_level) + " with " + str(len(neighbours)) + " neighbours (" + str(neighbours) + ")")
 
         ring = neighbourhood.get_ring(ring_level)
-        wrap_left = neighbourhood.can_wrap(Direction.LEFT)
-        wrap_right= neighbourhood.can_wrap(Direction.RIGHT)
+        # wrap_left = neighbourhood.can_wrap(Direction.LEFT)
+        # wrap_right= neighbourhood.can_wrap(Direction.RIGHT)
         left = ring.get_side(Direction.LEFT)
         right = ring.get_side(Direction.RIGHT)
 
         added_left, added_right = False, False
         for new_node in neighbours:
-            added_left |= left.add_neighbour(new_node, wrap_left) 
-            added_right |= right.add_neighbour(new_node, wrap_right)
+            added_left |= left.add_neighbour(new_node) 
+            added_right |= right.add_neighbour(new_node)
 
         sides = ((Direction.LEFT, added_left, left), (Direction.RIGHT, added_right, right))
         for direction, added, half_ring in sides:
