@@ -433,6 +433,7 @@ class JoinProcessor(VisitorMessage):
         print("0_0 visit_STJoinRequest, phase=",str(message.phase))
         if (self.debugging&1):
             import pdb; pdb.set_trace()
+        ln = self.__local_node
 
         if(message.phase == STJoinRequest.STATE_ASK):
             # A new node would like to join the network.
@@ -440,53 +441,55 @@ class JoinProcessor(VisitorMessage):
             if(self.is_busy()):
                 # The local node is already busy with another joining node.
                 join_error = STJoinError(message, "Contacted node already busy with a join activity")
-                self.__local_node.sign("sending error message "+join_error)
+                ln.sign("sending error message "+join_error)
                 route_msg = RouteDirect(join_error, message.joining_node)
-                self.__local_node.route_internal(route_msg)
+                ln.route_internal(route_msg)
 
             else:
                 # Compute a proposition for the joining node and sent it.
                 self.set_busy(True)
-                self.__local_node.status="welcoming %s" % repr(message.joining_node.name_id);
-                join_partition_id = self.compute_partition_id(message)
-                join_cpe, join_data, self.__new_local_cpe, self.__new_local_data = self.compute_cpe_and_data(message)
+                ln.status="welcoming %s" % repr(message.joining_node.name_id);
+                join_side, next_node = self.decide_side_join(message)
+                join_partition_id = self.compute_partition_id(message,join_side,next_node)
+                join_cpe, join_data, self.__new_local_cpe, self.__new_local_data =\
+                          self.compute_cpe_and_data(message,join_side)
 
-                self.__join_msg = STJoinReply(self.__local_node, STJoinReply.STATE_PROPOSE)
-                self.__join_msg.partition_id = join_partition_id
-                self.__join_msg.cpe = join_cpe
-                self.__join_msg.data = join_data
+                jm = self.__join_msg = STJoinReply(ln, STJoinReply.STATE_PROPOSE)
+                jm.partition_id = join_partition_id
+                jm.cpe = join_cpe
+                jm.data = join_data
                 
-                route_msg = RouteDirect(self.__join_msg, message.joining_node)
-                self.__local_node.sign("sending joinreply (ask phase)")
-                # this message is likely to be large. [network::]OutRequestManager may have
-                #  a hard time transmitting this.
-                self.__local_node.route_internal(route_msg) 
-                self.__local_node.sign("sent joinreply (ask phase)")
+                route_msg = RouteDirect(jm, message.joining_node)
+                ln.sign("sending joinreply (ask phase)")
+                # this message is likely to be large. [network::]OutRequestManager 
+                #  may have a hard time transmitting this.
+                ln.route_internal(route_msg) 
+                ln.sign("sent joinreply (ask phase)")
 
         elif(message.phase == STJoinRequest.STATE_ACCEPT):
             # blindly setup what the other node's compute_data_and_cpe has defined.
-            self.__local_node.sign("Update the local node data");
-            self.__local_node.cpe = self.__new_local_cpe
-            self.__local_node.data_store = DataStore(self.__new_local_data)
+            ln.sign("Update the local node data");
+            ln.cpe = self.__new_local_cpe
+            ln.data_store = DataStore(self.__new_local_data)
 
             print("0_0 Data Split accepted");
-            local_node_status = self.__local_node.status_updater
+            local_node_status = ln.status_updater
 
-            self.__local_node.sign("'repairing' the neighbourhood table")
+            ln.sign("'repairing' the neighbourhood table")
             local_node_status.update_status_now()
             self.set_busy(False)
             print("0_0 -- Join process completed. --");
 
-            self.__join_msg = STJoinReply(self.__local_node, STJoinReply.STATE_CONFIRM)
+            self.__join_msg = STJoinReply(ln, STJoinReply.STATE_CONFIRM)
             route_msg = RouteDirect(self.__join_msg, message.joining_node)
-            self.__local_node.sign("sending confirmation message")
-            self.__local_node.route_internal(route_msg)
+            ln.sign("sending confirmation message")
+            ln.route_internal(route_msg)
 
         else:
             join_error = STJoinError(message, "Unrecognized join request.")
-            self.__local_node.sign("sending error message "+join_error)
+            ln.sign("sending error message "+join_error)
             route_msg = RouteDirect(join_error, message.joining_node)
-            self.__local_node.route_internal(route_msg)
+            ln.route_internal(route_msg)
 
 
     def visit_STJoinReply(self, message):
@@ -534,57 +537,86 @@ class JoinProcessor(VisitorMessage):
         self.__reset_join_state()
         raise JoinException(message.reason)
 
-    def compute_partition_id(self, message):
-        new_side_join = Router.by_name_get_direction(self.__local_node.name_id, message.joining_node.name_id)
-        next_neighbour = self.__local_node.neighbourhood.get_neighbour(new_side_join, 0)
-        self.__local_node.sign("computing partition for joining node %f<?<%f"%(
-            self.__local_node.partition_id,next_neighbour.partition_id))
+    def decide_side_join(self, message):
+        ln = self.__local_node
+        nb    = ln.neighbourhood
+        lname = ln.name_id
+        jname = message.joining_node.name_id
+        side  = Router.by_name_get_direction(lname, jname)
+        nextn = nb.get_neighbour(side,0)
+        othern= nb.get_neighbour(not side,0)
+        wrapf = nb.can_wrap(side) # wrap forwards
+        wrapb = nb.can_wrap(not side) # wrap backwards
+
+        if (nextn.name_id == jname):
+            return side,nextn
+
+        if (not NodeID.lies_between_direction(side, lname, jname, nextn.name_id, wrapf)):
+            ln.sign("need to reverse side %s-%s-%s!"%(lname, jname, nextn.name_id))
+            if (othern.name_id==jname):
+                return not side, othern
+            
+            if(not NodeID.lies_between_direction(not side, lname, jname, othern.name_id, wrapb)):
+                LOGGER.debug("?_? node %s shouldn't have received %s ?_?"%(
+                    ln,message))
+                import pdb; pdb.set_trace()
+        
+            side = not side
+            nextn= othern
+        ln.sign("next on %s is %s"%("LEFT" if side else "RIGHT",repr(nextn)))
+        return side, nextn
+
+
+    def compute_partition_id(self, message, side_join, next_node):
+        ln=self.__local_node
+        ln.sign("computing partition for joining node %f<?<%f"%(
+            ln.partition_id,next_node.partition_id))
         partition_id = 0
-        if(next_neighbour != self.__local_node):
-            partition_id = PartitionID.gen_btw(self.__local_node.partition_id, next_neighbour.partition_id)
+        if(next_node != ln):
+            partition_id = PartitionID.gen_btw(ln.partition_id, next_node.partition_id)
         else:
-            assert next_neighbour == self.__local_node
+            assert next_node == ln
             if(new_side_join == Direction.RIGHT):
-                partition_id = PartitionID.gen_aft(self.__local_node.partition_id)
+                partition_id = PartitionID.gen_aft(ln.partition_id)
             else:
                 assert new_side_join == Direction.LEFT
-                partition_id = PartitionID.gen_bef(self.__local_node.partition_id)
+                partition_id = PartitionID.gen_bef(ln.partition_id)
 
-        assert partition_id != self.__local_node.partition_id and partition_id != next_neighbour.partition_id
+        assert partition_id != ln.partition_id and partition_id != next_node.partition_id
         return partition_id
 
 
-    def compute_cpe_and_data(self, message):
+    def compute_cpe_and_data(self, message, side_join):
         """Compute the CPE of the joining node."""
-        # Determine sides.
-        new_side_join = Router.by_name_get_direction(self.__local_node.name_id, message.joining_node.name_id)
-        new_side_local = Direction.get_opposite(new_side_join)
 
+        ln=self.__local_node
+        side_local = Direction.get_opposite(side_join)
+        
         # Create the CPE.
-        data_store = self.__local_node.data_store
-        [cut_dimension, cut_value, data_left, data_right] = data_store.get_partition_value(self.__local_node.cpe)
+        data_store = ln.data_store
+        [cut_dimension, cut_value, data_left, data_right] = data_store.get_partition_value(ln.cpe)
 
         # Create the CPE for the joining node.
-        new_join_node = InternalNode(new_side_join, cut_dimension, cut_value)
-        new_join_cpe = copy.deepcopy(self.__local_node.cpe)
-        new_join_cpe.add_node(new_join_node)
+        join_node = InternalNode(side_join, cut_dimension, cut_value)
+        join_cpe = copy.deepcopy(ln.cpe)
+        join_cpe.add_node(join_node)
 
         # Create the CPE for the local node.
-        new_local_node = InternalNode(new_side_local, cut_dimension, cut_value)
-        new_local_cpe = copy.deepcopy(self.__local_node.cpe)
-        new_local_cpe.add_node(new_local_node)
-        print("NEW CPE:: ", new_local_cpe)
+        local_node = InternalNode(side_local, cut_dimension, cut_value)
+        local_cpe = copy.deepcopy(ln.cpe)
+        local_cpe.add_node(local_node)
+        print("NEW CPE:: ", local_cpe)
 
         # Split the data.
-        if(new_side_join == Direction.LEFT):
-            new_join_value = data_left
-            new_local_value = data_right
+        if(side_join == Direction.LEFT):
+            join_value = data_left
+            local_value = data_right
         else:
-            assert new_side_join == Direction.RIGHT
-            new_join_value = data_right
-            new_local_value = data_left
+            assert side_join == Direction.RIGHT
+            join_value = data_right
+            local_value = data_left
 
-        return new_join_cpe, new_join_value, new_local_cpe, new_local_value
+        return join_cpe, join_value, local_cpe, local_value
 
 
     def visit_SNJoinRequest(self, message):

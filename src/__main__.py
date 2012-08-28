@@ -73,11 +73,12 @@ class ThreadListener(threading.Thread):
                        repr(self.__listener.address))
 
 class ThreadTalker(threading.Thread):
-
+    instance=None
     def __init__(self):
         """Launches the talking part of the Node"""
         threading.Thread.__init__(self)
         self.__interactive=True
+        assert(ThreadTalker.instance==None)
 #        self.__local_node = local_node
 
         self.__menu = list()
@@ -94,6 +95,7 @@ class ThreadTalker(threading.Thread):
         # thread
         self.uid=0
         self.portno=lnode.net_info.get_port()
+        ThreadTalker.instance=self
         
     def run(self):
 #        profiler= cProfile.Profile()
@@ -316,6 +318,7 @@ def main():
 
     global lnode
     global batchmode
+
     lnode = Node(name_id, numeric_id, net_info)
 
     print("NameID: ", lnode.name_id.name, sep="")
