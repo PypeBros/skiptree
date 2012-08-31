@@ -330,7 +330,7 @@ class HalfRingSet(object):
     def __repr__(self):
         rpr = str(len(self.__neighbours))+"#"
         for i in range(len(self.__neighbours)):
-            rpr += "%s @%x"%(self.__neighbours[i].name_id.__repr__(),
+            rpr += "%s"%(self.__neighbours[i].name_id.__repr__(),
                              id(self.__neighbours[i]))
             if (i != len(self.__neighbours) - 1):
                 rpr += ", "
