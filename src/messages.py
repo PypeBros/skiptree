@@ -266,7 +266,10 @@ class RouteByPayload(RouteMessage):
         self._state = self.STATE_ROUTING
 
     def __repr__(self):
-        return "<RPayload %s>"%self.payload
+        if self!=self.payload:
+            return "<RPayload %s>"%self.payload
+        else:
+            pass
 
     @property
     def routing(self):
@@ -589,10 +592,10 @@ class SNFixupHigher(RouteByPayload, CtrlMessage):
                 # The message must not be routed.
                 return None
             else:
-                LOGGER.debug( "[DBG] " + self._info() + "Route")
+                LOGGER.debug( "[DBG] " + repr(self) + "Route")
                 return neighbour
 
-        LOGGER.debug( "[DBG] " + self._info() + "Route")
+        LOGGER.debug( "[DBG] " + repr(self) + "Route")
 
         self.__nb_hops = self.__nb_hops + 1
 
@@ -628,13 +631,18 @@ class SNFixupHigher(RouteByPayload, CtrlMessage):
 
 
     def process(self, local_node):
-        LOGGER.debug( "[DBG] " + self._info() + "Process")
+        LOGGER.debug( "[DBG] " + repr(self) + "Process")
         if(self.__neighbours != None and 0 < len(self.__neighbours)):
             # This only happens if a node with at least one more common level have been found.
             local_node.neighbourhood.sign("repair(%s)"%self._info())
             NeighbourhoodNet.repair_level(local_node, local_node.neighbourhood, self.__ring_level + 1, self.__neighbours)
         else:
-            LOGGER.debug( "[DBG] " + self._info() + "Stop")
+            LOGGER.debug( "[DBG] " + repr(self) + "Stop")
+        
+    def __repr__(self):
+        return "<SNFixupHigher ((%i, %s from %s) #%i - RouteByPayload>"%(
+            self.__ring_level, Direction.get_name(self.__direction),
+            self.__src_node, self.__nb_hops)
 
     def _info(self):
         return "SNFixupHigher (%i, %s from %s) #%i - "%(

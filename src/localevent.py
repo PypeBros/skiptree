@@ -91,6 +91,8 @@ class MessageDispatcher(object):
                     self.__local_node.partition_id,len(destinations)))
                 if(next_hop != None):
                     if(next_hop.net_info == self.__local_node.net_info):
+                        if ('trace' in dir(message) and not 'trace' in dir(message.payload)):
+                            message.payload.trace = message.trace
                         message.payload.accept(self.__visitor_processing)
                     else:
                         self.__local_node.sender.send_msg(message, next_hop)
