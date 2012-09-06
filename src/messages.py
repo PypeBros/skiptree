@@ -88,9 +88,11 @@ class VisitorMessage(object):
     def visit_SNLeaveReply(self, message):
         pass
 
-    def visit_SNPingRequest(self, message):
+    def visit_SNPingMessage(self, message):
         pass
 
+    def visit_SNPingRequest(self, message):
+        pass
 
     def visit_STJoinRequest(self, message):
         pass
@@ -293,6 +295,7 @@ class RouteByCPE(RouteMessage):
         return "<RCPE %s to %s>"%(repr(self.payload),repr(self.__space_part))
 
     def sign(self, line):
+        LOGGER.debug("[DBG] %s %s"%(self,line))
         if (self.__log!=None):
             self.__log.append(line)
 
@@ -359,10 +362,13 @@ class AppMessage(Message):
 
 class CtrlMessage(Message):
     """CtrlMessage represents messages that create and maintain the overlay network."""
-
+    nextuid=0
+    
     def __init__(self):
         Message.__init__(self)
         self.__log=[]
+        self.uid=CtrlMessage.nextuid
+        CtrlMessage.nextuid+=1
 
     def process(self, local_node):
         """This function will be executed by each node that receive it."""
@@ -384,6 +390,7 @@ class CtrlMessage(Message):
             self.__log=None
 
 
+
 # ------------------------------------------------------------------------------------------------
 
 class SNJoinRequest(CtrlMessage):
@@ -396,6 +403,8 @@ class SNJoinRequest(CtrlMessage):
 
         self.__phase = self.SEED
         self.__joining_node = joining_node
+    def __repr__(self):
+        return "<SNJoinQ #%i>"%self.uid
 
     @property
     def state(self):
@@ -424,6 +433,11 @@ class SNJoinReply(CtrlMessage):
 
         self.__request_msg = join_req
         self.__neighbours = neighbours
+
+    def __repr__(self):
+        return "<SNJoinY: %s>"%(
+            self.__request_msg
+            )
 
     @property
     def neightbours(self):
@@ -469,7 +483,26 @@ class SNLeaveReply(CtrlMessage):
 
 
 class SNPingRequest(CtrlMessage):
-    """SNPingRequest is used by a node to tell his existence to oder node.
+    """Used to request a node to send us a ping message (i.e.
+       when routing table is incomplete to deliver another message)
+       """
+
+    def __init__(self, src, ring_level):
+        CtrlMessage.__init__(self)
+        self.source=src
+        self.ring_level=ring_level
+
+    def accept(self, visitor):
+        visitor.visit_SNPingRequest(self)
+
+    def __repr__(self):
+        return "<SNPingQ from %s#%i>"%(
+            self.source.name_id,self.source.cpe.k
+            )
+    
+
+class SNPingMessage(CtrlMessage):
+    """SNPingMessage is used by a node to tell his existence to oder node.
        This will cause the visited node to update its knowledge of the pinger's
        information (e.g. CPE).
     """
@@ -477,9 +510,10 @@ class SNPingRequest(CtrlMessage):
 
     def __init__(self, src_node, ring_level):
         CtrlMessage.__init__(self)
-
+        tr = src_node.neighbourhood.trace
         self.__src_node = src_node
         self.__ring_level = ring_level
+        self.__when = tr[-1]
 
     def sign(self, line):
         if (self.__log!=None):
@@ -492,7 +526,7 @@ class SNPingRequest(CtrlMessage):
     @trace.setter
     def trace(self,v):
         if v:
-            self.__log=[]
+            self.__log=[self.__when]
         else:
             self.__log=None
 
@@ -508,7 +542,12 @@ class SNPingRequest(CtrlMessage):
         return self.__ring_level
 
     def accept(self, visitor):
-        visitor.visit_SNPingRequest(self)
+        visitor.visit_SNPingMessage(self)
+
+    def __repr__(self):
+        return "<SNPing from %s#%i, %s>"%(
+            self.src_node.name_id,self.src_node.cpe.k,self.__when
+            )
 
 
 class SNFixupHigher(RouteByPayload, CtrlMessage):
@@ -592,12 +631,15 @@ class SNFixupHigher(RouteByPayload, CtrlMessage):
         LOGGER.debug( "[DBG] " + self._info() + "Process")
         if(self.__neighbours != None and 0 < len(self.__neighbours)):
             # This only happens if a node with at least one more common level have been found.
+            local_node.neighbourhood.sign("repair(%s)"%self._info())
             NeighbourhoodNet.repair_level(local_node, local_node.neighbourhood, self.__ring_level + 1, self.__neighbours)
         else:
             LOGGER.debug( "[DBG] " + self._info() + "Stop")
 
     def _info(self):
-        return "SNFixupHigher (" + str(self.__ring_level) + ", " + Direction.get_name(self.__direction) + ") - (" + str(self.__nb_hops) + ") - "
+        return "SNFixupHigher (%i, %s from %s) #%i - "%(
+            self.__ring_level, Direction.get_name(self.__direction),
+            self.__src_node, self.__nb_hops)
 
 # ------------------------------------------------------------------------------------------------
 
@@ -648,8 +690,11 @@ class STJoinReply(CtrlMessage):
         self.__partition_id = None
         self.__data = None
         self.__phase = state
+
+   
     #
     # Properties
+
 
     @property
     def contact_node(self):
@@ -896,6 +941,7 @@ class NeighbourhoodNet(object):
         for new_node in neighbours:
             added_left |= left.add_neighbour(new_node) 
             added_right |= right.add_neighbour(new_node)
+            neighbourhood.update(new_node)
 
         sides = ((Direction.LEFT, added_left, left), (Direction.RIGHT, added_right, right))
         for direction, added, half_ring in sides:
@@ -937,7 +983,7 @@ class NeighbourhoodNet(object):
         for neighbour in neighbours:
             LOGGER.debug( "[DBG] Send a Ping to: " + neighbour.__repr__())
 
-            payload_msg = SNPingRequest(node, ring_level)
+            payload_msg = SNPingMessage(node, ring_level)
             route_msg = RouteDirect(payload_msg, neighbour)
             node.route_internal(route_msg)
 

@@ -15,6 +15,7 @@ from equation import InternalNode, DataStore
 from messages import VisitorRoute, VisitorMessage
 from messages import RouteByNameID, RouteDirect
 from messages import SNJoinRequest, SNJoinReply, SNLeaveReply
+from messages import SNPingMessage, SNPingRequest
 from messages import STJoinReply, STJoinRequest, STJoinError, JoinException
 from messages import IdentityReply
 from messages import NeighbourhoodNet
@@ -148,7 +149,8 @@ class DatastoreProcessor(object):
     def receiveData(self, message):
         """ expect message ISA LookupReply """
         values = message.data
-        print("!_! %f - %s" % (message.nonce,repr(values)))
+        print("!_! DATA %f - %s" % (message.nonce,repr(values)))
+        print("!_! PATH %s"%(message.trace))
         if (self.debugging):
             import pdb; pdb.set_trace()
 
@@ -376,15 +378,22 @@ class ProcessorVisitor(VisitorMessage):
 
     #
     # Dispatching for the "General use" messages.
-
     def visit_SNPingRequest(self, message):
+        reply=SNPingMessage(self.__local_node, message.ring_level)
+        reply=RouteDirect(reply, message.source)
+        LOGGER.debug("[DBG] %s -> %s"%(message,reply))
+        self.__local_node.route_internal(reply)
+
+    def visit_SNPingMessage(self, message):
         # The source node common bit must be less or equal (because of neighbours selection).
         common_bit = self.__local_node.numeric_id.get_longest_prefix_length(message.src_node.numeric_id)
         assert message.ring_level <= common_bit
-
+        lng = self.__local_node.neighbourhood
+        lng.sign("%s @%i"%(
+            repr(message),message.ring_level))
         # Add the new neighbour.
-        self.__local_node.neighbourhood.add_neighbour(message.ring_level, message.src_node)
-
+        ngh = lng.add_neighbour(message.ring_level, message.src_node)
+        
     #
     # Dispatching "Application" messages.
 
@@ -660,7 +669,7 @@ class JoinProcessor(VisitorMessage):
         LOGGER.log(logging.DEBUG, "[DBG] SNJoinReply - Process")
         if (self.debugging&4):
             import pdb; pdb.set_trace()
-
+        ln.neighbourhood.sign("repair(%s)"%repr(message))
         NeighbourhoodNet.repair_level(ln, ln.neighbourhood, 0, message.neightbours)
 
         # The contact node for SkipTree is the left or right neighbour.

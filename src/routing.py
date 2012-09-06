@@ -8,7 +8,7 @@ from util import Direction
 from equation import Component
 from equation import CPEMissingDimension
 from equation import Range
-
+from messages import SNPingRequest, RouteDirect # for late-fill of the tables.
 # ------------------------------------------------------------------------------
 
 # Module log abilities
@@ -48,7 +48,10 @@ class PidRange(Range):
             return pid-1
         return None
     
-        
+class IncompleteRouteTableEx(Exception):
+    def __init__(self,missing,msg):
+        self.node=missing
+        self.message=msg
 
 
 class RouterReflect(object):
@@ -147,14 +150,20 @@ class RouterReflect(object):
         
         for dirx, prange, pd in directions:
             for height in range(neighbourhood.nb_ring-1,-1,-1):
-                if neighbourhood.size(dirx,height)<1:
-                    continue # this ring is empty
+                if neighbourhood.size(dirx,height)<2:
+                    continue # this ring is empty or has a single node.
                 ngh = neighbourhood.get_neighbour(dirx, height)
                 pid = ngh.partition_id
                 if ngh == lastngh:
                     continue # we just checked this neighbour
                 lastngh=ngh
                 self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
+                if (ngh.cpe.k==0):
+                    ngh.queue(message)
+                    reply=RouteDirect(SNPingRequest(local_node,height),ngh)
+                    self.__lastcall.append("requesting routing table complement at %s"%ngh)
+                    return [(ngh,reply)]
+                    # todo: rate-limit to avoid redundant PING requests.
 
                 epid=prange.includes_pid(pid) # effective pid = pid+{-1,0,+1}
                 if (epid!=None):
@@ -172,7 +181,9 @@ class RouterReflect(object):
                             repr(left), repr(here), repr(right),
                             'L' if dirx == Direction.LEFT else 'R'))
                     lastpid = pid
-                    prange = prange.restrict(dirx,pid)
+                    # prange = prange.restrict(dirx,epid)
+                    # ^ not sure it's the wise place to do so,
+                    #   we can't take into account wraps this way.
                     if (not RouterReflect.__goes_backward(dirx, left, right)):
                         break
                 else:

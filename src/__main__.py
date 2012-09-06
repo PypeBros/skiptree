@@ -10,7 +10,7 @@ import os # exit
 from localevent import MessageDispatcher
 
 from messages import RouteByNumericID, RouteByCPE
-from messages import SNPingRequest, InsertionRequest, LookupRequest
+from messages import SNPingMessage, InsertionRequest, LookupRequest
 
 from network import InRequestManager
 from node import NetNodeInfo, Node
@@ -30,6 +30,7 @@ LOG_HANDLER.setLevel(logging.DEBUG)
 LOGGER = logging.getLogger("__main__")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
+
 
 
 # ----------------------------------------------------------------------------
@@ -72,7 +73,7 @@ class ThreadListener(threading.Thread):
             LOGGER.log(logging.ERROR, "The listener coudn't be started for %s." %
                        repr(self.__listener.address))
 
-# from __main__ import ThreadTalker; ThreadTalker.instance.debugging=True
+#  from __main__ import ThreadTalker; ThreadTalker.instance.debugging=True
 #  ^ type this at (pdb) prompt to disengage interactive polling for input.
 class ThreadTalker(threading.Thread):
     instance=None
@@ -185,13 +186,13 @@ class ThreadTalker(threading.Thread):
         if (lnode.cpe.k<=0):
             raise ValueError("I should have a CPE to do that %s"%lnode.cpe.pname)
         findRQ = LookupRequest(keypart,lnode)
-        print("@_@ %f - %s - %s"%(findRQ.nonce, input(),repr(keypart)))
+        print("@_@ SEND %f - %s - %s"%(findRQ.nonce, input(),repr(keypart)))
         m = RouteByCPE(findRQ,keypart)
         m.forking=True
         p = lnode.partition_id
         m.limit=PidRange(p-1, p+1)
         m.trace=True
-        m.sign("leaving home")
+        m.sign("leaving home %s"%lnode.pname)
         lnode.route_internal(m)
 
     def __send_data(self):
@@ -208,6 +209,11 @@ class ThreadTalker(threading.Thread):
         print("ignoring inputs for %i seconds" % seconds)
         time.sleep(seconds)
 
+    def __isatty(self):
+        print("stdin: %s tty"%("IS" if sys.stdin.isatty() else "NOT"))
+        print("stdout: %s tty"%("IS" if sys.stdout.isatty() else "NOT"))
+        print("stderr: %s tty"%("IS" if sys.stderr.isatty() else "NOT"))
+
     def __display(self):
         display_actions = list()
         display_actions.append(("Display the local node.", self.__display_node))
@@ -217,6 +223,7 @@ class ThreadTalker(threading.Thread):
         display_actions.append(("Sleep", self.__sleep))
         display_actions.append(("Send a RouteByNumericID message.", self.__send_RouteByNumericID))
         display_actions.append(("reply to heartbeat",self.__report_status))
+        display_actions.append(("am I on a tty?",self.__isatty))
 
         self.__get_action(display_actions)
 
@@ -262,7 +269,7 @@ class ThreadTalker(threading.Thread):
 
         num_id = NumericID(input())
 
-        payload_msg = SNPingRequest(lnode, 0)
+        payload_msg = SNPingMessage(lnode, 0)
         route_msg = RouteByNumericID(payload_msg, num_id)
         lnode.route_internal(route_msg)
 
@@ -304,9 +311,28 @@ def do_batch_job(host, port, filename):
         m.sign("leaving home")
         lnode.route_internal(m)
     LOGGER.debug("done with feeding process.")
+# code snippet, to be included in 'sitecustomize.py'
+import sys
+
+def catcha(type, value, tb):
+    print("your CATCHA caught %s"%repr(type))
+    if type!=AssertionError:
+    #if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+    # we are in interactive mode or we don't have a tty-like
+    # device, so we call the default hook
+       sys.__excepthook__(type, value, tb)
+    else:
+      import traceback, pdb
+      # we are NOT in interactive mode, print the exception...
+      traceback.print_exception(type, value, tb)
+      print(">_< Good luck sorting that out");
+      # ...then start the debugger in post-mortem mode.
+      pdb.pm()
 
 
 def main():
+
+    sys.excepthook = catcha
 
     INDEX_LOCAL_IP, INDEX_LOCAL_PORT, INDEX_NAME_ID, INDEX_NUM_ID, WELCOME_IP, WELCOME_PORT, BATCH_FILE = range(1, 8)
 
@@ -325,7 +351,7 @@ def main():
 
     print("NameID: ", lnode.name_id.name, sep="")
     print("NumericID: ", lnode.numeric_id.get_numeric_id_hex(), " (", int(lnode.numeric_id), ")", sep="")
-    
+   
     # Create the sub-parts of the program
     th_dispatcher = ThreadDispatcher()
     threads.append(th_dispatcher)

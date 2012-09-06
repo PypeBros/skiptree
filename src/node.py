@@ -117,6 +117,7 @@ class Node(object):
         self.__status_up.daemon = True
         self.__running_op=["Bootstrap"]
         self.__major_state="Boot"
+        self.__pending=[]   # messages waiting to be delivered.
         #self.__status_up.start()
 
     #
@@ -263,12 +264,24 @@ class Node(object):
         if (self.__dispatcher != None):
             self.__dispatcher.put(message)
 
+    def queue(self,message):
+        self.__pending.append(message)
+        message.sign("queued until %s is updated"%(self.pname))
+
+    # neighbourhood replaces one instance of Node by the one in SNPingMessage
+    #  during routing table (skipnet) update. That's when this one is called.
+    def postprocess(self, lnode):
+        for m in self.__pending:
+            m.sign("released after update of %s"%(self.pname))
+            lnode.route_internal(m)
+        self.__pending=[] # they've all been unlocked.
+
     #
     # Overwritten
     @property
     def pname(self):
-        return "<Node--%i, %s :: %s> @ %x" % (
-            self.__numeric_id, repr(self.__name_id),
+        return "<Node--%i--%.3f, %s :: %s> @ %x" % (
+            self.numeric_id, self.partition_id,repr(self.name_id),
             self.cpe.pname, id(self)
             )
 
@@ -335,7 +348,7 @@ class NodeStatusPublisher(threading.Thread):
     """Regularly publish the status of a node."""
 
     # Time between each heart beat (in seconds).
-    DEFAULT_TIME_BTW_BEAT = 10 * 60
+    DEFAULT_TIME_BTW_BEAT = 10 #* 60 # 10 minutes !
 
     def __init__(self, local_node, heartbeat_delay=DEFAULT_TIME_BTW_BEAT):
         threading.Thread.__init__(self)
@@ -358,7 +371,8 @@ class NodeStatusPublisher(threading.Thread):
                 assert (time_next_action - time_current) < self.__heartbeat_delay
                 time.sleep(time_next_action - time_current)
 
-
+    # invoked when STJoinRequest.STATE_ACCEPT is received,
+    # just after we applied CPE and Datastore changes.
     def update_status_now(self):
         """Warm neighbours for a new local status."""
         self.__update_status()
@@ -368,6 +382,7 @@ class NodeStatusPublisher(threading.Thread):
         """Ping current neighbours and repair locals rings."""
         neighbourhood = self.__local_node.neighbourhood
         nb_ring_level = neighbourhood.nb_ring
+        neighbourhood.sign("update_status()")
 
         print("0_0 updating rings: ",nb_ring_level);
         for ring_level in range(nb_ring_level):

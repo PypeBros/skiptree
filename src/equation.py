@@ -992,7 +992,6 @@ the Node that delimits the area managed by the Node."""
         """
         nb_here = 0
         here, left, right = False, False, False
-
         for inode in self.__internal_nodes:
 
             if(not space_part.exists(inode.dimension)):

@@ -1,7 +1,7 @@
 #ssh-add planetlab-id_rsa
 
 # SYNchronises the launcher with planetlab nodes
-alias SYN 'cat ulgple_disco.nodes | fe - " echo % ; rsync launch.pl ulgple_disco@%: &"'
+alias SYN 'grep -v ^# ulgple_disco.nodes | fe - " echo % ; rsync launch.pl ulgple_disco@%: &"'
 
 # launches the planetlab nodes
 alias GO 'grep -v ^# ulgple_disco.nodes | fe - "ssh ulgple_disco@% -C '"'"'killall perl ; killall python3 ; sleep 2 ; perl launch.pl'"'"'&"'
@@ -11,7 +11,7 @@ perl mcp.pl &
 alias LOC 'perl ~/SIM/dataset/csv2py.pl ~/SIM/dataset/telescope/csv1/out-tsc-noampr-1226451600-001.csv.gz 1 0 6000 | python3 src/__main__.py 139.165.223.18 8080 seed 42'
 
 # upgrade the peer code on planetlab
-alias SRC 'cat ulgple_disco.nodes | fe - "rsync -avz src/* ulgple_disco@%:src/ && echo % updated. &"'
+alias SRC 'grep -v ^# ulgple_disco.nodes | fe - "rsync -avz src/* ulgple_disco@%:src/ && echo % updated. &"'
 
 # forces the MCP to restart.
 alias KIK 'echo TRON | nc beetle 8086'

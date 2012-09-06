@@ -45,6 +45,21 @@ class Neighbourhood(object):
         nb_ring = local_node.numeric_id.get_nb_digit() + 1
         for i in range(nb_ring):
             self.__rings.append(RingSet(local_node))
+        self.trace=[]
+        self.lastupdate=dict()
+        self.__updateid=0
+
+
+    def sign(self, message):
+        self.trace.append("(%i) %s"%(self.__updateid,message))
+        self.__updateid = self.__updateid+1
+
+    def update(self, node):
+        if not repr(node.name_id) in self.lastupdate:
+            self.lastupdate[repr(node.name_id)]='n'
+        self.lastupdate[repr(node.name_id)]+="u%i@%i:%i"%(
+            -1,self.__updateid,node.cpe.k)
+        
 
     #
     # Properties
@@ -93,6 +108,12 @@ class Neighbourhood(object):
         added = False
         if(0 <= level and level < len(self.__rings)):
             added = self.__rings[level].add_neighbour(new_neighbour)
+            ## tracking evolution.
+            if not repr(new_neighbour.name_id) in self.lastupdate:
+                self.lastupdate[repr(new_neighbour.name_id)]="=%i"%self.__updateid
+            fmt =  "+%i@%i:%i" if added else ",%i@%i:%i"
+            self.lastupdate[repr(new_neighbour.name_id)]+=fmt%(
+                level,self.__updateid,new_neighbour.cpe.k)
         return added
 
     def remove_neighbour(self, old_neighbour):
@@ -267,6 +288,8 @@ class HalfRingSet(object):
                     # WARNING: Node.__eq__ not only compares the nameID and numeric_ID,
                     #  but also partition_id and net_info.
                     # Always take the latest version of node (CPE may change).
+                    self.__neighbours[i].cpe=node_to_add.cpe
+                    self.__neighbours[i].postprocess(self.__local_node)
                     self.__neighbours[i] = node_to_add
                     return False
                 else:
@@ -330,8 +353,7 @@ class HalfRingSet(object):
     def __repr__(self):
         rpr = str(len(self.__neighbours))+"#"
         for i in range(len(self.__neighbours)):
-            rpr += "%s"%(self.__neighbours[i].name_id.__repr__(),
-                             id(self.__neighbours[i]))
+            rpr += "%s"%(self.__neighbours[i].name_id.__repr__())
             if (i != len(self.__neighbours) - 1):
                 rpr += ", "
                 # assert (self.__neighbours[i].name_id < self.__neighbours[i+1].name_id),"neighbours ordered."+str(i)+" "+str(self.__neighbours)+"\n"+self.__local_node.status
