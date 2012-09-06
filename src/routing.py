@@ -107,16 +107,16 @@ class RouterReflect(object):
 
     # applies equation-driven routing, allowing messages to be 'forked'
     #  into sub-messages (using PidRanges)
-    def by_cpe_get_next_hop_forking(self, local_node, message):
+    def by_cpe_get_next_hop_forking(self, lnode, message):
         self.__lastcall=['bycpe+f']
         dest = []
-        left, here, right = local_node.cpe.which_side_space(message.space_part, True)
+        left, here, right = lnode.cpe.which_side_space(message.space_part, True)
         if (here) :
             # TODO : that shouldn't be 'naked' message, but a clone with 
             #   search range that has been 'constraint' to stick here.
             newmsg = copy.copy(message)
-            newmsg.limit=PidRange(local_node.partition_id,local_node.partition_id)
-            dest.append((local_node, newmsg))
+            newmsg.limit=PidRange(lnode.partition_id,lnode.partition_id)
+            dest.append((lnode, newmsg))
 
         # create 'directions', that identifies sub-rings to be scanned
         #   and the sub-range of PartitionID that should be taken into account.
@@ -126,17 +126,17 @@ class RouterReflect(object):
 
         directions = list()
         if (left):
-            r = message.limit.restrict(Direction.RIGHT,local_node.partition_id)
+            r = message.limit.restrict(Direction.RIGHT,lnode.partition_id)
             directions.append((Direction.LEFT,r,'L'))
 
         if (right):
-            r = message.limit.restrict(Direction.LEFT,local_node.partition_id)
+            r = message.limit.restrict(Direction.LEFT,lnode.partition_id)
             directions.append((Direction.RIGHT,r,'R'))
 
         self.__lastcall.append("scanning rings @%s: %s"%(
-            local_node.partition_id,repr(directions)))
+            lnode.partition_id,repr(directions)))
         part = message.space_part
-        neighbourhood = local_node.neighbourhood
+        neighbourhood = lnode.neighbourhood
         lastpid, lastngh = None, None
 
         # (point) routing guideline:
@@ -160,7 +160,7 @@ class RouterReflect(object):
                 self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
                 if (ngh.cpe.k==0):
                     ngh.queue(message)
-                    reply=RouteDirect(SNPingRequest(local_node,height),ngh)
+                    reply=RouteDirect(SNPingRequest(lnode,height),ngh)
                     self.__lastcall.append("requesting routing table complement at %s"%ngh)
                     return [(ngh,reply)]
                     # todo: rate-limit to avoid redundant PING requests.
@@ -196,15 +196,15 @@ class RouterReflect(object):
     # Route by CPE
     # Point and Node have same dimension defined.   
 
-    def __by_cpe_get_next_hop_default(self, local_node, message, canfork):
-        self.__lastcall.append(repr(local_node.cpe))
-        left, here, right = local_node.cpe.which_side_space(message.space_part)
+    def __by_cpe_get_next_hop_default(self, lnode, message, canfork):
+        self.__lastcall.append(repr(lnode.cpe))
+        left, here, right = lnode.cpe.which_side_space(message.space_part)
         if(here):
             # The message is intended to the local node.
-            return [(local_node, message)]
+            return [(lnode, message)]
         else:
             last_pid_checked = None
-            neigbourhood = local_node.neighbourhood
+            neigbourhood = lnode.neighbourhood
 
             directions = (Direction.LEFT, Direction.RIGHT)
             for dirx in directions:
@@ -214,7 +214,7 @@ class RouterReflect(object):
                     self.__lastcall.append("%s (%i,%s)"%(neighbour.pname,height,repr(dirx)))
                     neighbour_pid = neighbour.partition_id
 
-                    if(RouterReflect.check_position_partition_tree(dirx, last_pid_checked, neighbour_pid, local_node.partition_id)):
+                    if(RouterReflect.check_position_partition_tree(dirx, last_pid_checked, neighbour_pid, lnode.partition_id)):
                         # Now, we are sure that the neighbour_pid is really smaller (higher) 
                         # than the local node one when the direction is set to LEFT (RIGHT).
                         # So, RIGHT is RIGHT and LEFT is LEFT.
@@ -228,10 +228,10 @@ class RouterReflect(object):
     #
     # Route by CPE (for Simple and Range queries)
 
-    def __by_cpe_get_next_hop_search(self, local_node, message):
+    def __by_cpe_get_next_hop_search(self, lnode, message):
         try:
             # Add virtual dimensions for the undefined ones.
-            dim_cpe = local_node.cpe.dimensions
+            dim_cpe = lnode.cpe.dimensions
             dim_msg = message.space_part.dimensions
 
             dim_unknown = dim_cpe.difference(dim_msg)
@@ -243,12 +243,12 @@ class RouterReflect(object):
             # Do the routing.    
             directions = list()
             all_intended = list()
-            left, here, right = local_node.cpe.which_side_space(message.space_part)
+            left, here, right = lnode.cpe.which_side_space(message.space_part)
 
             if (here):
-                if(RouterReflect.__is_pid_in_range(local_node.partition_id, message.limit)):
+                if(RouterReflect.__is_pid_in_range(lnode.partition_id, message.limit)):
                     #TODO: put the message in the dispatcher and not in the node list
-                    all_intended.append((local_node, message))
+                    all_intended.append((lnode, message))
 
             if (left):
                 directions.append(Direction.LEFT)
@@ -256,19 +256,19 @@ class RouterReflect(object):
                 directions.append(Direction.RIGHT)
 
             last_pid_checked = None
-            neigbourhood = local_node.neighbourhood
+            neigbourhood = lnode.neighbourhood
 
             for direction in directions:
                 for height in range(neigbourhood.nb_ring - 1, -1, -1):
                     neighbour = neigbourhood.get_neighbour(direction, height)
                     neighbour_pid = neighbour.partition_id
 
-                    if(RouterReflect.check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node.partition_id)):
+                    if(RouterReflect.check_position_partition_tree(direction, last_pid_checked, neighbour_pid, lnode.partition_id)):
                         left, here, right = False, False, False
                         upper_limit = last_pid_checked
                         last_pid_checked = neighbour_pid
 
-                        if(RouterReflect.__is_pid_in_range(local_node.partition_id, message.limit)):
+                        if(RouterReflect.__is_pid_in_range(lnode.partition_id, message.limit)):
                             if (neighbour.cpe.k<=0):
                                 LOGGER.log(logging.DEBUG, "empty CPE for %s routing %s"%(neighbour,message))
                                 pdb.set_trace()
@@ -328,7 +328,7 @@ class RouterReflect(object):
     
 
     @staticmethod
-    def check_position_partition_tree(direction, last_pid_checked, neighbour_pid, local_node_pid):
+    def check_position_partition_tree(direction, last_pid_checked, neighbour_pid, lnode_pid):
         """Indicates if the node is on the correct side of the partition tree."""
         if(last_pid_checked != None):
             # The last_pid_checked is defined.
@@ -337,7 +337,7 @@ class RouterReflect(object):
         else:
             # The last_pid_checked isn't defined.
             # The strongest constrain is to check the position in comparison of local node pid.
-            return RouterReflect.__check_pid(direction, neighbour_pid, local_node_pid)
+            return RouterReflect.__check_pid(direction, neighbour_pid, lnode_pid)
 
     @staticmethod
     def __check_pid(direction, pidA, pidB):

@@ -265,6 +265,8 @@ class Node(object):
             self.__dispatcher.put(message)
 
     def queue(self,message):
+        """hold a message until a node is updated (new CPE)
+           message must be for the RouteVisitor, not app message"""
         self.__pending.append(message)
         message.sign("queued until %s is updated"%(self.pname))
 

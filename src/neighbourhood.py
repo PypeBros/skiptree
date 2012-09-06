@@ -68,8 +68,8 @@ class Neighbourhood(object):
         """Return the number of neighbours ring."""
         return len(self.__rings)
 
-    def can_wrap(self, direction):
-        return self.get_ring(0).can_wrap(direction)
+    def can_wrap(self, direction, skip=None):
+        return self.get_ring(0).can_wrap(direction,skip)
 
 
     def get_ring(self, ring_level):
@@ -78,14 +78,18 @@ class Neighbourhood(object):
         return self.__rings[ring_level]
 
     # ultimately used by CPE routing.
-    def get_neighbour(self, direction, ring_level):
-        """Return the closest neighbour in one direction."""
+    def get_neighbour(self, direction, ring_level,skip=None):
+        """Return the closest neighbour in one direction.
+           you can use skip to instruct the neighbourhood
+           to ignore a specific name.
+        """
+        
         assert(0 <= ring_level and ring_level < self.nb_ring)
 
         ring_set = self.__rings[ring_level]
         half_ring_set = ring_set.get_side(direction)
 
-        return half_ring_set.get_closest()
+        return half_ring_set.get_closest(skip)
 
     def size(self, direction, ring_level):
         """Return the closest neighbour in one direction."""
@@ -147,15 +151,15 @@ class RingSet(object):
         self.__right = HalfRingSet(Direction.RIGHT, self.__local_node)
 
 
-    def can_wrap(self,dir):
+    def can_wrap(self,dir,skip):
         """ indicates whether it's fine to wrap around in a given direction
             i.e. wrapleft <=> N0,L.name > n.name
                  wrapright<=> N0,R.name < n.name
         """
         if (dir==Direction.LEFT):
-            return self.__left.get_closest().name_id > self.__local_node.name_id
+            return self.__left.get_closest(skip).name_id > self.__local_node.name_id
         else:
-            return self.__right.get_closest().name_id< self.__local_node.name_id
+            return self.__right.get_closest(skip).name_id< self.__local_node.name_id
 
 
     #
@@ -241,9 +245,10 @@ class HalfRingSet(object):
     def size(self):
         return len(self.__neighbours)
 
-    def get_closest(self):
+    def get_closest(self, skip=None):
         """Return the closest neighbour of the local node."""
-        return self.__get_node(0)
+        candi = self.__get_node(0)
+        return candi if (skip!=None and candi.name_id!=skip) else self.__get_node(1)
 
     def get_farthest(self):
         """Return the farthest neighbour of the local node."""

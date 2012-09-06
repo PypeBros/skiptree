@@ -165,6 +165,7 @@ print "# @inodes\n";
 print "# @inodes\n";
 
 foreach(@leftwards) {
+  s/^--/NOCPE--/;
   print "$_ [label=\"$treelinks{$_}\"","]\n";
 }  
 
@@ -175,6 +176,7 @@ foreach(@inodes) {
 }
 
 foreach(@rightwards) {
+  s/^--/NOCPE--/;
   print "$_ [label=\"$treelinks{$_}\"","]\n";
 }  
 

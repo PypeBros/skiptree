@@ -35,9 +35,20 @@ LOGGER = logging.getLogger("localevent")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
+
+class RoutingDeferred(Exception):
+    def __init__(self, loc):
+        Exception.__init__(self)
+        self.where=loc # string expected.
+    def __str__(self):
+        return "<Routing Deferred at %s>"%loc
+
+
 # ---------------------------------------------------------------------------
 # lnode.dispatcher._MessageDispatcher__visitor_routing.debugging=31
 # lnode.dispatcher._MessageDispatcher__visitor_processing._ProcessorVisitor__join_processor.debugging=True
+
+
 
 class MessageDispatcher(object):
     """Dispatch messages through components of the application.
@@ -76,7 +87,7 @@ class MessageDispatcher(object):
                        self.__queue.qsize(),reason))
         while(self.__queue.qsize()>0):
             message = self.__queue.get()
-            LOGGER.log(">> %s"%repr(message))
+            LOGGER.debug(">> %s"%repr(message))
         
         
     
@@ -91,8 +102,9 @@ class MessageDispatcher(object):
                     self.__local_node.partition_id,len(destinations)))
                 if(next_hop != None):
                     if(next_hop.net_info == self.__local_node.net_info):
-                        if ('trace' in dir(message) and not 'trace' in dir(message.payload)):
-                            message.payload.trace = message.trace
+                        hastrace = ('trace' in dir(message))
+                        if not 'trace' in dir(message.payload):
+                            message.payload.trace = message.trace if hastrace else ["no trace"]
                         message.payload.accept(self.__visitor_processing)
                     else:
                         self.__local_node.sender.send_msg(message, next_hop)
@@ -119,8 +131,11 @@ class MessageDispatcher(object):
         #TODO: Change exception management, local_node comparison  
         while True:
             message = self.__queue.get()
-            self.dispatch_one(message,self.get_destinations(message))
-            sys.stdout.flush()
+            try:
+                self.dispatch_one(message,self.get_destinations(message))
+                sys.stdout.flush()
+            except RoutingDeferred as rd:
+                LOGGER.debug("routing of %s got deferred at %s"%(repr(message),rd.where))
             self.__queue.task_done()
 
 # Visitor Message is handling the application-level processing,
@@ -428,15 +443,13 @@ class JoinProcessor(VisitorMessage):
 
     #
     #
-
-    def is_busy(self):
+    # busy should become the message that 
+    def is_busy(self, request):
         """Return the state of the JoinProcessor."""
-        return self.__join_busy
+        return self.__join_busy!=False and self.__join_busy!=request
 
     def set_busy(self, value):
         """Set the state of the JoinProcessor."""
-
-
         self.__join_busy = value
 
     def visit_STJoinRequest(self, message):
@@ -449,7 +462,7 @@ class JoinProcessor(VisitorMessage):
         if(message.phase == STJoinRequest.STATE_ASK):
             # A new node would like to join the network.
 
-            if(self.is_busy()):
+            if(self.is_busy(message)):
                 # The local node is already busy with another joining node.
                 join_error = STJoinError(message, "Contacted node already busy with a join activity")
                 ln.sign("sending error message "+join_error)
@@ -458,10 +471,12 @@ class JoinProcessor(VisitorMessage):
 
             else:
                 # Compute a proposition for the joining node and sent it.
-                self.set_busy(True)
+                self.set_busy(message)
                 ln.status="welcoming %s" % repr(message.joining_node.name_id);
                 join_side, next_node = self.decide_side_join(message)
+                ln.sign("next on %s is %s"%("LEFT" if join_side else "RIGHT",repr(next_node)))
                 join_partition_id = self.compute_partition_id(message,join_side,next_node)
+                ln.sign("assigned pid=%f"%join_partition_id)
                 join_cpe, join_data, self.__new_local_cpe, self.__new_local_data =\
                           self.compute_cpe_and_data(message,join_side)
 
@@ -511,7 +526,7 @@ class JoinProcessor(VisitorMessage):
 
         if(message.phase == STJoinReply.STATE_PROPOSE):
             self.__local_node.sign("join proposition received "+str(message.contact_node))
-            if(self.is_busy()):
+            if(self.is_busy(message)):
                 # The local node is already busy with another joining node.
                 join_error = STJoinError(message, "Contacted node already busy with a join activity")
                 self.__local_node.sign("joining and busy!?")
@@ -519,7 +534,7 @@ class JoinProcessor(VisitorMessage):
                 self.__local_node.route_internal(route_msg)
 
             else:
-                self.set_busy(True)
+                self.set_busy(message)
                 print("0_0 adding data in the local store ...")
                 self.__local_node.sign("inserting into local store")
                 # Set data received from contact node.
@@ -554,29 +569,34 @@ class JoinProcessor(VisitorMessage):
         lname = ln.name_id
         jname = message.joining_node.name_id
         side  = Router.by_name_get_direction(lname, jname)
-        nextn = nb.get_neighbour(side,0)
-        othern= nb.get_neighbour(not side,0)
-        wrapf = nb.can_wrap(side) # wrap forwards
-        wrapb = nb.can_wrap(not side) # wrap backwards
+        nextn = nb.get_neighbour(side,0,jname)
+        othern= nb.get_neighbour(not side,0,jname)
+        wrapf = nb.can_wrap(side,jname) # wrap forwards
+        wrapb = nb.can_wrap(not side,jname) # wrap backwards
 
         if (nextn.name_id == jname):
-            return side,nextn
+            hring = nb.get_ring(0).get_side(side)
+            if hring.size<2:
+                return side,ln # there isn't enough neighbours yet.
+            nextn=hring.get_neighbours()[1] # skip new-comer
 
         if (not NodeID.lies_between_direction(side, lname, jname, nextn.name_id, wrapf)):
-            ln.sign("need to reverse side %s-%s-%s!"%(lname, jname, nextn.name_id))
+            ln.sign("need to reverse side %s-%s-%s %s!"%(lname, jname, nextn.name_id,repr(wrapf)))
             if (othern.name_id==jname):
-                return not side, othern
+                hring = nb.get_ring(0).get_side(not side)
+                if hring.size<2:
+                    return not side, ln
+                othern=hring.get_neighbours()[1] #skip new-comer
             
             if(not NodeID.lies_between_direction(not side, lname, jname, othern.name_id, wrapb)):
-                LOGGER.debug("?_? node %s shouldn't have received %s ?_?"%(
-                    ln,message.trace))
+                LOGGER.debug("?_? node %s shouldn't have received %s (%s ; %s)?_?"%(
+                    ln,message.trace,othern.pname,repr(wrapb)))
                 print(">_< debugging")
                 import pdb; pdb.set_trace()
                 print("<_> resuming")
         
             side = not side
             nextn= othern
-        ln.sign("next on %s is %s"%("LEFT" if side else "RIGHT",repr(nextn)))
         return side, nextn
 
 
@@ -585,14 +605,21 @@ class JoinProcessor(VisitorMessage):
         ln.sign("computing partition for joining node %f<?<%f"%(
             ln.partition_id,next_node.partition_id))
         partition_id = 0
+        if(next_node!=ln and next_node.cpe.k==0):
+            ln.sign("%s isn't ready to welcome a new node"%next_node.pname)
+            next_node.queue(RouteDirect(message,ln))
+            request=RouteDirect(SNPingRequest(ln,0),next_node)
+            ln.route_internal(request)
+            raise RoutingDeferred("compute_partition_id")
+        
         if(next_node != ln):
             partition_id = PartitionID.gen_btw(ln.partition_id, next_node.partition_id)
         else:
             assert next_node == ln
-            if(new_side_join == Direction.RIGHT):
+            if(side_join == Direction.RIGHT):
                 partition_id = PartitionID.gen_aft(ln.partition_id)
             else:
-                assert new_side_join == Direction.LEFT
+                assert side_join == Direction.LEFT
                 partition_id = PartitionID.gen_bef(ln.partition_id)
 
         assert partition_id != ln.partition_id and partition_id != next_node.partition_id

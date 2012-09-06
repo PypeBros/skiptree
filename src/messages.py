@@ -756,8 +756,8 @@ class STJoinReply(CtrlMessage):
         visitor.visit_STJoinReply(self)
 
 
-def STJoinError(CtrlMessage):
-
+class STJoinError(CtrlMessage):
+    """sorry, you cannot join right here right now"""
     def __init__(self, original_message=None, reason=""):
         CtrlMessage.__init__(self)
         print("0_0 ERROR: ",original_message);
