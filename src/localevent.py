@@ -602,8 +602,6 @@ class JoinProcessor(VisitorMessage):
 
     def compute_partition_id(self, message, side_join, next_node):
         ln=self.__local_node
-        ln.sign("computing partition for joining node %f<?<%f"%(
-            ln.partition_id,next_node.partition_id))
         partition_id = 0
         if(next_node!=ln and next_node.cpe.k==0):
             ln.sign("%s isn't ready to welcome a new node"%next_node.pname)
@@ -612,14 +610,28 @@ class JoinProcessor(VisitorMessage):
             ln.route_internal(request)
             raise RoutingDeferred("compute_partition_id")
         
+        # we need to cancel cross-wrap generation of partitionID so that the
+        # rightmost node on the tree is the one with highest PID, leftmost node
+        # is the one with lowest PID and PID monotonously increases in-between.
+        if next_node.partition_id < ln.partition_id and side_join==Direction.RIGHT:
+            ln.sign("RIGHT wrap detected with %s"%next_node.pname)
+            next_node=ln
+        if next_node.partition_id > ln.partition_id and side_join==Direction.LEFT:
+            ln.sign("LEFT wrap detected with %s"%next_node.pname)
+            next_node=ln
+        
         if(next_node != ln):
+            ln.sign("computing partition for joining node %f<?<%f"%(
+                ln.partition_id,next_node.partition_id))
             partition_id = PartitionID.gen_btw(ln.partition_id, next_node.partition_id)
         else:
             assert next_node == ln
             if(side_join == Direction.RIGHT):
+                ln.sign("computing partition for joining node %f<?"%(ln.partition_id))
                 partition_id = PartitionID.gen_aft(ln.partition_id)
             else:
                 assert side_join == Direction.LEFT
+                ln.sign("computing partition for joining ?<%f"%ln.partition_id)
                 partition_id = PartitionID.gen_bef(ln.partition_id)
 
         assert partition_id != ln.partition_id and partition_id != next_node.partition_id
