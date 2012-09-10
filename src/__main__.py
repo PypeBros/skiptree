@@ -162,7 +162,7 @@ class ThreadTalker(threading.Thread):
 
     def __report_status(self):
         """used to reply to MCP's heartbeat requests"""
-        print("0_0 name=%s"% lnode.name_id)
+        print("0_0 name=%s--%x--%f"% (lnode.name_id,lnode.numeric_id,lnode.partition_id))
         print("0_0 stat="+lnode.status)
         print("0_0 cpe=%s"%lnode.cpe.pname)
         for x in lnode.neighbourhood.get_all_unique_neighbours():

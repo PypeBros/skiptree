@@ -267,9 +267,15 @@ class Tester(object):
         
         
 
-        assert ave.get_neighbour(0,Direction.RIGHT) == n2,\
+        assert ave.get_neighbour(Direction.RIGHT,0,NameID('Smith')) == n2,\
                "why is %s first right of %s instead of %s ?"%(
-                   repr(ave.get_neighbour(0,Direction.RIGHT)),lnode, n2)
+                   repr(ave.get_neighbour(Direction.RIGHT,0)),lnode, n2)
+        assert ave.get_neighbour(Direction.RIGHT,0) == n2,\
+               "why is %s first right of %s instead of %s ?"%(
+                   repr(ave.get_neighbour(Direction.RIGHT,0)),lnode, n2)
+        assert ave.get_neighbour(Direction.RIGHT,0,n2.name_id) == n3,\
+               "why is %s next right of %s instead of %s ?"%(
+                   repr(ave.get_neighbour(Direction.RIGHT,0)),lnode, n3)
         
 
         ave.add_neighbour(1,n3)

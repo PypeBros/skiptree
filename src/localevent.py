@@ -695,15 +695,18 @@ class JoinProcessor(VisitorMessage):
 
     def visit_SNJoinReply(self, message):
         ln = self.__local_node
+        ng = ln.neighbourhood
+
         LOGGER.log(logging.DEBUG, "[DBG] SNJoinReply - Process")
         if (self.debugging&4):
             import pdb; pdb.set_trace()
-        ln.neighbourhood.sign("repair(%s)"%repr(message))
-        NeighbourhoodNet.repair_level(ln, ln.neighbourhood, 0, message.neightbours)
+
+        ng.sign("repair(%s)"%repr(message))
+        NeighbourhoodNet.repair_level(ln, ng, 0, message.neightbours)
 
         # The contact node for SkipTree is the left or right neighbour.
-        node_left = ln.neighbourhood.get_neighbour(Direction.LEFT, 0)
-        node_right = ln.neighbourhood.get_neighbour(Direction.RIGHT, 0)
+        node_left = ng.get_neighbour(Direction.LEFT, 0)
+        node_right = ng.get_neighbour(Direction.RIGHT, 0)
 
         psl = ln.name_id.get_longest_prefix_length(node_left.name_id)
         psr = ln.name_id.get_longest_prefix_length(node_right.name_id)
@@ -712,9 +715,12 @@ class JoinProcessor(VisitorMessage):
         payload_msg.sign("%s joint SN. Candidates for ST are %s:%f or %s:%f"%(
             ln.name_id, node_left.name_id, psl, node_right.name_id, psr))
 
-        contact_node = node_left
+        # decide which neighbour we will join.
         print("0_0 %s@%f -vs- %s@%f"%(node_left, psl, node_right, psr));
-        if(psl < psr):
+        contact_node = node_left
+        if(ng.can_wrap(Direction.LEFT)):
+            contact_node = node_right
+        elif(psl < psr and not ng.can_wrap(Direction.RIGHT)):
             contact_node = node_right
         ln.sign("joint the skipnet")
         payload_msg.sign("prefered %s"%contact_node.name_id)

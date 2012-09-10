@@ -248,7 +248,7 @@ class HalfRingSet(object):
     def get_closest(self, skip=None):
         """Return the closest neighbour of the local node."""
         candi = self.__get_node(0)
-        return candi if (skip!=None and candi.name_id!=skip) else self.__get_node(1)
+        return candi if (skip==None or candi.name_id!=skip) else self.__get_node(1)
 
     def get_farthest(self):
         """Return the farthest neighbour of the local node."""
