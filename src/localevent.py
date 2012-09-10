@@ -102,9 +102,10 @@ class MessageDispatcher(object):
                     self.__local_node.partition_id,len(destinations)))
                 if(next_hop != None):
                     if(next_hop.net_info == self.__local_node.net_info):
-                        hastrace = ('trace' in dir(message))
+                        hastrace = ('trace' in dir(msgcause))
                         if not 'trace' in dir(message.payload):
-                            message.payload.trace = message.trace if hastrace else ["no trace"]
+                            message.payload.trace = msgcause.trace if hastrace else ["no trace"]
+                            # most messages has no trace, btw.
                         message.payload.accept(self.__visitor_processing)
                     else:
                         self.__local_node.sender.send_msg(message, next_hop)
@@ -160,6 +161,8 @@ class DatastoreProcessor(object):
             import pdb; pdb.set_trace()
         values = self.__local_node.data_store.get(message.key)
         reply = LookupReply(values, message.nonce)
+        reply.trace = message.trace
+        reply.trace.append("reading data at %s"%self.__local_node.pname)
         route = RouteDirect(reply, message.originator)
         self.__local_node.route_internal(route)
 
@@ -170,7 +173,7 @@ class DatastoreProcessor(object):
         print("!_! PATH %s"%(message.trace))
         if (self.debugging):
             import pdb; pdb.set_trace()
-
+        
 
 # ------------------------------------------------------------------------------------------------
 

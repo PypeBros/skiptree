@@ -150,7 +150,7 @@ class RouterReflect(object):
         
         for dirx, prange, pd in directions:
             for height in range(neighbourhood.nb_ring-1,-1,-1):
-                if neighbourhood.size(dirx,height)<2:
+                if height>0 and neighbourhood.size(dirx,height)<2:
                     continue # this ring is empty or has a single node.
                 ngh = neighbourhood.get_neighbour(dirx, height)
                 pid = ngh.partition_id
@@ -189,7 +189,7 @@ class RouterReflect(object):
                 else:
                     self.__lastcall.append("%f out of partition range %s"%
                                            (pid,repr(prange)))
-        print("0_0 %s"%repr(self))
+        print("0_0 %s : %i"%(repr(message),len(dest)))
         return dest
                     
     #
