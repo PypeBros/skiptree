@@ -78,7 +78,7 @@ sub split_node {
   return ($2,$3,$1,$4);
 }
 
-
+# suitable for a "no destination" dump from a RouterVisitor.
 sub parse_log {
   my $log = $_[0];
   $log =~ /\<RCPE (LRQ#[0-9.]+) to \<\@:(.*)\@\>\> in \<Router.isitor:\[('.*')\]> --tr: \[('.*')\]/
@@ -122,7 +122,50 @@ sub parse_log {
   }
 }
 
-parse_log(<>);
+# suitable to diagnose a message that comes back with !_! DATA and !_! PATH
+sub parse_path {
+  my $log = $_[0];
+  chomp $log;
+  die "no multi-line (...$1\\n$2...)" if $log=~/(.{0,20})\n(.{0,20})/m;
+  #                            first reply v       more replies v   v newline?
+  $log =~ /!_! DATA ([0-9.]+) - \[\(\<\@:(.*?)\@\>, \[[^]]*\]\).*\].*!_! PATH \[('.*')\]/
+    or die "not a message path\n".substr($log,0,20)."...".substr($log,-20,20);
+  my ($id, $target, $mlog)=($1,$2,$3,);
+  
+  my @vals = split /\)/,$target;
+  foreach (@vals) {
+    length($_)>0 or next;
+    /=?([0-9a-z]+) \(([A-Z][a-z]+)/ or die "wrong format for val $_ in target";
+    $target{$2}=$1;
+  }
+  my $nvals=int(keys %target);
+  print STDERR "$nvals values in target.\n";
+
+  my ($rp,$nname,$ncpe,$npid) = ($mlog);
+  my $hopno=0;
+  while (length($rp)>0) {
+    ($nname, $ncpe, $npid,$rp)=split_node($rp); 
+    last if !defined $nname;
+    $ncpe=~s/ \([A-Z][a-z]+\)\)/\)/g;
+    print STDERR "\t$nname ::= $ncpe\n";
+    process_cpe("HOP:$hopno","$nname:$npid", split/&/,$ncpe);
+    $hopno++;
+  }
+}
+
+my $data='';
+while ($_=<>) {
+  parse_log($_) if /RCPE .LRQ/;
+  parse_path($data.$_) if /!_! PATH/;
+  if (/!_! DATA/) {
+    chomp;
+    $data=$_;
+    next;
+  } else{
+    $data='';
+  }
+
+}
     
 print <<___
 graph {

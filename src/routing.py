@@ -42,10 +42,10 @@ class PidRange(Range):
         #   range underflows.
         if (self.includes_value(pid)):
             return pid
-        if (self.max>1 and self.includes_value(pid+1)):
-            return pid+1
-        if (self.min<0 and self.includes_value(pid-1)):
-            return pid-1
+#         if (self.max>1 and self.includes_value(pid+1)):
+#             return pid+1
+#         if (self.min<0 and self.includes_value(pid-1)):
+#             return pid-1
         return None
     
 class IncompleteRouteTableEx(Exception):
@@ -112,9 +112,10 @@ class RouterReflect(object):
         dest = []
         left, here, right = lnode.cpe.which_side_space(message.space_part, True)
         if (here) :
-            # TODO : that shouldn't be 'naked' message, but a clone with 
+            # NOTE: it cannot be 'naked' message, but must be a clone with 
             #   search range that has been 'constraint' to stick here.
             newmsg = copy.copy(message)
+            newmsg.trace=copy.copy(message.trace)
             newmsg.limit=PidRange(lnode.partition_id,lnode.partition_id)
             dest.append((lnode, newmsg))
 
@@ -154,7 +155,7 @@ class RouterReflect(object):
                     continue # this ring is empty or has a single node.
                 ngh = neighbourhood.get_neighbour(dirx, height)
                 pid = ngh.partition_id
-                if ngh == lastngh:
+                if lastngh!=None and ngh.name_id == lastngh.name_id:
                     continue # we just checked this neighbour
                 lastngh=ngh
                 self.__lastcall.append("%s (%i, %s)"%(ngh.pname, height, repr(dirx)))
@@ -173,7 +174,7 @@ class RouterReflect(object):
                             "%s is %s compared to %s"%
                             (part, 'here' if here else 'forw', repr(ngh.cpe)))
                         newmsg = copy.copy(message)
-                        newmsg.sign("routed to %s along %s"%(ngh.pname, ngh.cpe))
+                        newmsg.sign("routed to %s at h=%i"%(ngh.pname, height))
                         newmsg.limit = prange.restrict(Direction.get_opposite(dirx),epid)
                         dest.append((ngh, newmsg))
                     else:
@@ -181,9 +182,9 @@ class RouterReflect(object):
                             repr(left), repr(here), repr(right),
                             'L' if dirx == Direction.LEFT else 'R'))
                     lastpid = pid
-                    # prange = prange.restrict(dirx,epid)
-                    # ^ not sure it's the wise place to do so,
-                    #   we can't take into account wraps this way.
+                    prange = prange.restrict(dirx,epid)
+                    # ^ messages that will be generated after this one will not be allowed
+                    #   to forward beyond the 'current position'.
                     if (not RouterReflect.__goes_backward(dirx, left, right)):
                         break
                 else:
