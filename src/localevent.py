@@ -114,17 +114,12 @@ class MessageDispatcher(object):
                     pdb.set_trace()
                     LOGGER.log(logging.WARNING, "message has been dropped")
         else:
-            report = "no destination for %s in %s --tr: %s" % (
-                repr(msgcause), repr(self.__visitor_routing), repr(msgcause.trace))
+            report = "no destination for %s in %s --tr: %s --at %s" % (
+                repr(msgcause), repr(self.__visitor_routing), repr(msgcause.trace),self.__local_node)
             LOGGER.log(logging.DEBUG,
                        "[DBG:%s] %s"%(self.__local_node.name_id,report))
-            # the >_< message is supposed to force launch.pl to stop using MCP
-            #  as STDIN feeder and ask to the terminal instead.
-            print (">_< %s"%report)
-            sys.stdout.flush()
-            pdb.set_trace()
-            print ("<_> resuming")
-            sys.stdout.flush()
+            if 'routingError' in dir(msgcause.payload):
+                msgcause.payload.routingError(ValueError(report))
         
 
     def dispatch(self):

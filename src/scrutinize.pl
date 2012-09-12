@@ -26,22 +26,28 @@ sub process_cpe {
   my $parent=undef;
   my ($nlabel, $ndir, $id, $lastdir)=();
   my $termno=1;
+  my $path='r';
   print STDERR join ';',@textcpe;
   foreach(@textcpe) {
     next if length($_)==0;
     if (/\(([A-Z][a-z]+) ([<=>]) ([0-9a-zA-Z]+)/) {
-      $nlabel="$1 ? $3";
+      $nlabel="$path|$1 ? $3";
       $ndir = $2;
-      my $tval = $target{$1};
-      $ndir = '>>' if $ndir eq '>' && $tval gt $3;
-      $ndir = '<<' if $ndir eq '<' && $tval lt $3;
-      print STDERR "[$1: $tval <?> $3]\n";
+      if (exists $target{$1}) {
+	my $tval = $target{$1};
+	$ndir = '>>' if $ndir eq '>' && $tval gt $3;
+	$ndir = '<<' if $ndir eq '<' && $tval lt $3;
+#	print STDERR "[$1: $tval <?> $3]\n";
+      } else {
+	$ndir = $ndir.'?';
+      }
+
     } else {
       die "unknown term # $termno in equation: $_";
     }
     $termno++;
     
-    if (!exists $treenodes{$nlabel}) {
+    if (!exists $treenodes{"$nlabel"}) {
       $id = "n".int(keys %treenodes);
       $treenodes{$nlabel}=$id;
     } else {
@@ -52,6 +58,7 @@ sub process_cpe {
       $treelinks{"$parent--$id"}=$lastdir;
       # TODO: bold links if they match %target information.    
     }
+    $path.=$ndir;
     $lastdir=$ndir;
     $parent=$id;
   }
@@ -107,7 +114,7 @@ sub parse_log {
       $rp=$3;
     }
     $how.=',OORANGE' if $rp=~/^'[^']+out of partition range[^']+/;
-    process_cpe($how,$nname.':'.$npid, split(/&/,$ncpe));
+    process_cpe($how,$nname.'\n'.$npid, split(/&/,$ncpe));
   }
   
   $rp=$mlog; # processing the message's route log.
@@ -117,7 +124,7 @@ sub parse_log {
     last if !defined $nname;
     $ncpe=~s/ \([A-Z][a-z]+\)\)/\)/g;
     print STDERR "\t$nname ::= $ncpe\n";
-    process_cpe("HOP:$hopno","$nname:$npid", split/&/,$ncpe);
+    process_cpe("HOP:$hopno","$nname\\n$npid", split/&/,$ncpe);
     $hopno++;
   }
 }
@@ -155,7 +162,7 @@ sub parse_path {
 
 my $data='';
 while ($_=<>) {
-  parse_log($_) if /RCPE .LRQ/;
+  parse_log($_) if /RCPE LRQ/;
   parse_path($data.$_) if /!_! PATH/;
   if (/!_! DATA/) {
     chomp;
@@ -176,6 +183,7 @@ ___
 
 foreach(keys %treenodes) {
   my $title=$_;
+  $title=~s/[r<>?]+\|(.*)/$1/;
   my @attr=split /,/,$treenodes{$_};
   my $node=shift @attr;
   my $shape= $node=~/^l/ ? "box" : "parallelogram";
@@ -200,7 +208,7 @@ foreach(keys %treenodes) {
 }
 
 my @all=keys %treelinks;
-my @leftwards = grep {$treelinks{$_} le '<<'} @all;
+my @leftwards = grep {$treelinks{$_} le '<?'} @all;
 my @rightwards= grep {$treelinks{$_} ge '>'} @all;
 my @inodes = keys %treenodes;
 print "# @inodes\n";

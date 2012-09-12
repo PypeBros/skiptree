@@ -894,6 +894,11 @@ class LookupRequest(AppMessage):
     def originator(self):
         return self.__from
 
+    def routingError(self,error):
+        reply=LookupReply(error,self.__nonce)
+        reply=RouteDirect(reply,self.__from)
+        return reply
+
     @property
     def nonce(self):
         """uniquely identify the request (among the originator node)
