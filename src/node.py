@@ -342,6 +342,7 @@ class Node(object):
         state['_Node__data_store'] = None
         state['_Node__running_op'] = None
         state['_Node__major_state'] = None
+        state['_Node__pending'] = []
 
         return state
 
