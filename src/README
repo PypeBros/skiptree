@@ -1,0 +1,130 @@
+=================================================================
+
+DISco's Skiptree implementation release notes
+
+S. Martin (2011-2012), funding from Belgian FNRS
+Ph. Clerinx (2010-2011), funding from EU ResumeNet FP7
+
+=================================================================
+
+The skiptree node is implemted in Python and run with the command:
+
+python3 src/__main__.py <local address> <local port> <nameid> <numid>
+
+<local address>:<local port> is how other systems will contact your
+skiptree node. Make sure your local firewall allows TCP connections
+to be established towards this endpoint.
+
+Each node on the skiptree is identified with a NameID (any readable
+string). This should either be picked randomly or adjusted so that
+it will be able to assist an overloaded node. 
+
+Additionally, nodes should receive a random 'numerical ID' that is
+used during the join process to define the favourite neighbours of
+the new node at the "skipnet" (L1-overlay) level.
+
+The above command starts the node in "interactive" mode, where you
+will use program's standard input to pick actions in a menu:
+
+  0. Display local node information.
+  1. Add data to the local node
+  2. Send a join message (SkipTree).
+  3. Send a leave message.
+  4. Send data to the skiptree.
+  5. check data on the skiptree.
+  6. Dump data store
+  7. Display Current Status
+  8. Debug
+
+----- Running a SEED node -----------------------------------------
+
+Nodes can only join the skiptree if there is some data to share. 
+This is due to the fact that new overlay "coordinates" involve the
+selection of equations (CPE) to split the existing dataset equally
+between the new nodes. If A has already some data and B has none,
+then B should join A, and not the other way.
+
+The tool csv2py.pl allows you to fill a node with data locally and
+make it a suitable "seed" for other nodes to build a network. This
+tool produces essentially records such as 
+<key>
+SpacePart([Component(Dimension.get('Iproto'),'06'),
+           Component(Dimension.get('Isrc'),'7d59d8fa'),
+           Component(Dimension.get('Idst'),'00001011'),
+           Component(Dimension.get('Tsrc'),'0bcf'),
+           Component(Dimension.get('Tdst'),'1f40'),
+           Component(Dimension.get('Tflags'),'02'),])
+['1',%s]</key>
+
+out of a CSV file that provides a split view of network traffic (pcap)
+capture:
+
+<key>45000030,05ea,4000,6f,06,7d59d8fa,00001011,TCP,0bcf,1f40,b67e3248,00000000,70,02,ffff,00000204055001010402</key>
+
+The skiptree implementation can actually tolerate any number of
+'dimensions', with freely assigned names, as long as the data can
+be sorted with lexicographical ordering. You may need to hack csv2py
+script to accommodate your needs, though.
+
+csv2py.pl also generate additional control character so that it can
+feed the skiptree menu directly (i.e. typing "1" for "add data to the
+local node"). Typical use will be 
+
+perl csv2py.pl <.csv.gz file> <istep> <uid0> <uidN> | <main.py
+invocation>
+
+'uid' adds a 'pure data' (non-key) part to each record in the form of
+a serial number ranging from <uid0> to <uidN>.
+
+After the requested (<uidN>-<uid0>)/<istep> records have been converted
+from the gz file to skiptree menu commands, csv2py.pl will forward
+transparently its own STDIN to STDOUT, allowing user to take control
+of the initialized node.
+
+EXAMPLE: 
+
+<key> perl csv2py.pl example.csv.gz 1 0 6000 | python3 src/__main__.py localhost 8080 seeed 42 </key>
+
+will launch a node on 127.0.0.1:8080 and feed it with the 6000 first
+entries of the example.csv.gz file.
+
+You can then launch a second instance, e.g. with 
+<key> python3 src/__main__.py localhost 8082 tesst 64 </key>
+and instruct it to connect to the first one by typing the following
+instructions:
+NameID: tesst
+NumericID: 64 (100)
+
+<key>
+Which action do you want to do ?
+  0. Display local node information.
+  1. Add data to the local node
+  2. Send a join message (SkipTree).
+  3. Send a leave message.
+  4. Send data to the skiptree.
+  5. check data on the skiptree.
+  6. Dump data store
+  7. Display Current Status
+  8. Debug
+  <b>2</b>
+  Enter the bootstrap contact information
+  Port (2000):
+  <b>8080</b>
+  Host (127.0.0.1):
+  <b>localhost</b>
+</key>
+
+If successful, you'll see "#_# CONNECTED" as the last line of your
+"tesst" node. You can cross-check the success by asking each node to
+show their characteristic equations (<key>0</key> then <key>1</key>
+from the main menu)
+
+You should then see something like 
+<equation.CPE object at 0x97128ac>
+(node 00001388 (Idst) (Idst) >)</equation>
+
+If the node failed to connect, then you'll simply have
+<equation.CPE object at 0x97128ac></equation>
+
+---- Running the MASTER CONTROL PROGRAM ----------------------------
+

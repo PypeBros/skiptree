@@ -190,7 +190,11 @@ class RouterReflect(object):
                 else:
                     self.__lastcall.append("%f out of partition range %s"%
                                            (pid,repr(prange)))
-        print("0_0 %s : %i"%(repr(message),len(dest)))
+#        print("0_0 %s : %i"%(repr(message),len(dest)))
+# ^it's a bad idea to do a per-message report to the MCP. Use your
+#  'personal log' for that. Otherwise, you're forcing the MCP to do
+#  a poll with period approaching msg_rate x buffer_size or your
+#  own node will stall, waiting for room to appear in STDOUT buffer.
         return dest
                     
     #
