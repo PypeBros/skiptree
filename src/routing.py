@@ -4,10 +4,9 @@ import logging
 
 # ResumeNet imports
 from util import Direction
-
-from equation import Component
+from equation import InternalNode, DataStore
+from equation import Component, Range
 from equation import CPEMissingDimension
-from equation import Range
 from messages import SNPingRequest, RouteDirect # for late-fill of the tables.
 # ------------------------------------------------------------------------------
 
@@ -52,6 +51,104 @@ class IncompleteRouteTableEx(Exception):
     def __init__(self,missing,msg):
         self.node=missing
         self.message=msg
+
+class Router(object):
+    """ An object that returns (hop, message) as needed by the
+        dispatcher and its routing visitor for different type of
+        routing.
+        """
+    def __init__(self, local_node):
+        self.__local_node = local_node
+
+    #
+    #
+
+    def route_directly(self, message):
+        """Return the next network interface to witch send a message in a direct routing."""
+        return [(message.destination, message)]
+
+    #
+    #
+
+    def route_by_numeric(self, message):
+        """Return the next network interface to witch send a message in a numeric routing."""
+        next_hop = self.__by_numeric_get_next_hop(self.__local_node, message)
+        return [(next_hop, message)]
+
+    def __by_numeric_get_next_hop(self, local_node, message):
+        """Return the next hop to witch send the message (in a route by numeric id).
+        
+        The idea is to find the node with as many bits in common than the one searched for. 
+        In a ring the best node is the one with at least 'level' bits common with the destination. 
+        Otherwise, the best node is the one that have the most common bits with the destination.
+        """
+        LOGGER.log(logging.DEBUG, "[DBG] Get_next_hop from " + local_node.__repr__())
+        if (message.dest_num_id == local_node.numeric_id or message.final_destination):
+            return local_node
+
+        if message.start_node == local_node:
+            # The whole ring have been traversed (without having found a higher level node).
+            message.final_destination = True
+            return message.best_node
+
+        common_bits = message.dest_num_id.get_longest_prefix_length(local_node.numeric_id)
+        if common_bits > message.ring_level:
+            # The current node is also a neighbour of a higher level, do a new circular look.
+            message.ring_level = common_bits
+            message.start_node = local_node
+            message.best_node = local_node
+
+        elif (abs(int(message.dest_num_id) - int(local_node.numeric_id)) < abs(int(message.dest_num_id) - int(message.best_node.numeric_id))):
+            # Found a better candidate for the current ring.
+            message.best_node = local_node
+
+        return local_node.neighbourhood.get_neighbour(Direction.RIGHT, message.ring_level)
+
+    #
+    #
+
+    def route_by_name(self, message):
+        """Return the list of pair (next network interface, message) to witch send the message in a routing by name."""
+        next_hop = self.__by_name_get_next_hop(self.__local_node, message)
+        return [(next_hop, message)]
+
+    def __by_name_get_next_hop(self, local_node, message):
+        """Return the next hop to witch send the message (in a route by name id).
+        Nodes in a ring are sorted by name. The principle is to inspect a ring and
+        find a node whose name is the closest to the destination one but not positioned
+        after it. By looping downward in rings, name are always closer and closer to
+        the destination name.  
+        """
+        LOGGER.log(logging.DEBUG, "route_by_name %s"%message)
+        message.sign("reached "+local_node.__repr__())
+        neighbourhood = local_node.neighbourhood
+        ln = local_node.name_id
+        dn = message.dest_name_id
+        direction = self.by_name_get_direction(ln, dn)
+        canwrap = neighbourhood.can_wrap(direction)
+
+        # Loop from the highest ring to the smallest one. 
+        for height in range(neighbourhood.nb_ring - 1, -1, -1):
+            half_ring = neighbourhood.get_ring(height).get_side(direction)
+            next_hop = half_ring.get_closest()
+
+            message.sign("next hop "+next_hop.__repr__())
+            if (local_node != next_hop and
+                NodeID.lies_between_direction(direction, ln, next_hop.name_id, dn, canwrap)):
+                # The farthest node that doesn't jump after the destination node have been found.                
+                return next_hop
+        
+        message.sign("that's my final destination")
+        return local_node
+
+    @staticmethod
+    def by_name_get_direction(node_name_id, dest_name_id):
+        """Return the direction in witch send the message."""
+        if (node_name_id < dest_name_id):
+            return Direction.RIGHT
+        else:
+            return Direction.LEFT
+
 
 
 class RouterReflect(object):

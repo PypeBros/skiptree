@@ -8,9 +8,9 @@ import logging
 # ResumeNet imports
 from equation import CPE
 from equation import DataStore
-
-from messages import RouteDirect, RouteByNameID, NeighbourhoodNet
-from messages import SNJoinRequest, SNLeaveRequest
+from join import NeighbourhoodNet, SNJoinRequest
+from messages import SNLeaveRequest
+from messages import RouteDirect, RouteByNameID
 from messages import EncapsulatedMessage
 
 from nodeid import NumericID, PartitionID
