@@ -2,7 +2,7 @@ import copy
 import logging
 import sys
 
-from routing import Router
+from routing import Router, RoutingDeferred
 
 from messages import VisitorMessage, CtrlMessage
 from messages import RouteDirect, RouteByNameID, RouteByPayload
@@ -379,10 +379,13 @@ class JoinProcessor(VisitorMessage):
                 # Compute a proposition for the joining node and sent it.
                 self.set_busy(message)
                 ln.status="welcoming %s" % repr(message.joining_node.name_id);
+
                 join_side, next_node = self.decide_side_join(message)
                 ln.sign("next on %s is %s"%("LEFT" if join_side else "RIGHT",repr(next_node)))
+
                 join_partition_id = self.compute_partition_id(message,join_side,next_node)
                 ln.sign("assigned pid=%f"%join_partition_id)
+
                 join_cpe, join_data, self.__new_local_cpe, self.__new_local_data =\
                           self.compute_cpe_and_data(message,join_side)
 

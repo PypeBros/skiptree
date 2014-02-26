@@ -3,6 +3,7 @@ import copy
 import logging
 
 # ResumeNet imports
+from nodeid import NodeID
 from util import Direction
 from equation import InternalNode, DataStore
 from equation import Component, Range
@@ -17,6 +18,14 @@ LOG_HANDLER.setLevel(logging.DEBUG)
 LOGGER = logging.getLogger("routing")
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
+
+class RoutingDeferred(Exception):
+    def __init__(self, loc):
+        Exception.__init__(self)
+        self.where=loc # string expected.
+    def __str__(self):
+        return "<Routing Deferred at %s>"%loc
+
 
 # ------------------------------------------------------------------------------
 # the following algorithms work under the assumption that nodes in the tree (and

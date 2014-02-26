@@ -472,18 +472,20 @@ class DataStore(object):
             LOGGER.log(logging.DEBUG, "[EQN] we should keep out of %s-%s along %s"%(
                 repr(dims[d][0]), repr(dims[d][1]), d.dimension))
 
-        comp_counters.sort(key=lambda val_counter: val_counter.nb_virtual)
-        comp_counters.sort(key=lambda val_counter: val_counter.ratio_diff_between_side)
+        N = len(self.__data_by_dimension)
+
+        comp_counters.sort(key=lambda cc: (1+cc.nb_virtual)/N * cc.ratio_diff_between_side *\
+                           (2 if cc.dimension in cpe.dimensions else 1))
+#        comp_counters.sort(key=lambda val_counter: val_counter.ratio_diff_between_side)
         counters= []
         for cc in comp_counters:
             if (not cc.dimension in dims):
-                LOGGER.log(logging.DEBUG, "[EQN] %s hasn't been used yet"%(
-                    repr(cc)))
+                LOGGER.debug("[EQN] %s hasn't been used yet"%cc)
                 counters.append(cc)
             elif (cc.redundant(dims[cc.dimension])):
-                LOGGER.log(logging.DEBUG, "[EQN] %s is redundant against %s"%(
-                    repr(cc),repr(dims[cc.dimension])))
+                LOGGER.debug("[EQN] %s is redundant against %s"%(cc,dims[cc.dimension]))
             else:
+                LOGGER.debug("[EQN] %s could be reused"%cc)
                 counters.append(cc)
         
 
@@ -643,7 +645,7 @@ class CompCounter(object):
         if (self.__changed):
             return "<CompCounter: "+str(self.__dimension)+" "+str(self.size)+" values, dirty>"
         else:
-            return "<CompCounter: %s =? %s (%iv/%id)>"%(str(self.__dimension), str(self.__cut_value),self.nb_virtual,self.ratio_diff_between_side)
+            return "<CompCounter: %s =? %s (%iv/%fd)>"%(str(self.__dimension), str(self.__cut_value),self.nb_virtual,self.ratio_diff_between_side)
 
     def __compute_best_partition_value(self):
         """Return the best partition value."""
